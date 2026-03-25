@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#e94560">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="视频中心">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
+    
+    <!-- PWA -->
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
+    
+    <title>🎬 视频中心</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/mobile.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">🎬 视频中心</div>
+            <div class="stats">
+                <span id="videoCount">共 {{ total }} 个视频</span>
+                <span id="storageStats"></span>
+                <button class="btn-icon" onclick="showPlaylists()" title="播放列表">📋</button>
+                <button class="btn-icon" onclick="showHistory()" title="观看历史">📜</button>
+                <button class="btn-icon" onclick="showStats()" title="统计分析">📊</button>
+                <button class="btn-icon" onclick="toggleTheme()" title="切换主题">🌓</button>
+            </div>
+        </header>
+        
+        <!-- 上传区域 -->
+        <div class="upload-section">
+            <h3 class="section-title">📤 上传视频</h3>
+            
+            <form class="upload-form" id="uploadForm" enctype="multipart/form-data">
+                <div class="file-input-wrapper">
+                    <label for="file" class="file-label">
+                        <span class="file-icon">📁</span>
+                        <span class="file-text">点击选择视频文件</span>
+                    </label>
+                    <input type="file" name="file" id="file" accept="video/*" multiple>
+                    <div class="file-info" id="fileInfo"></div>
+                </div>
+                
+                <div class="upload-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="compressCheck" checked>
+                        <span>🗜️ 自动压缩 (节省空间，推荐)</span>
+                    </label>
+                </div>
+                
+                <button type="submit" class="btn-upload" id="uploadBtn">
+                    <span class="btn-text">⬆️ 开始上传</span>
+                </button>
+            </form>
+            
+            <!-- 上传进度 -->
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-header">
+                    <span class="progress-label" id="progressLabel">准备上传...</span>
+                    <span class="progress-percent" id="progressPercent">0%</span>
+                </div>
+                <div class="progress-bar" id="progressBar"></div>
+                <div class="compression-result" id="compressionResult"></div>
+            </div>
+        </div>
+        
+        <!-- 工具栏 -->
+        <div class="toolbar">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="🔍 搜索视频文件名...">
+                <button class="btn-search" onclick="filterVideos()">搜索</button>
+                <button class="btn-search btn-clear" onclick="clearSearch()">清空</button>
+            </div>
+            
+            <div class="view-options" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <select id="sortSelect" onchange="sortVideos(this.value)" style="padding: 10px 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; font-size: 14px; min-height: 44px;">
+                    <option value="date" {% if request.args.get('sort') == 'date' %}selected{% endif %}>📅 按日期</option>
+                    <option value="name" {% if request.args.get('sort') == 'name' %}selected{% endif %}>🔤 按名称</option>
+                    <option value="size" {% if request.args.get('sort') == 'size' %}selected{% endif %}>💾 按大小</option>
+                    <option value="duration" {% if request.args.get('sort') == 'duration' %}selected{% endif %}>⏱️ 按时长</option>
+                </select>
+                <button class="btn-search" onclick="showFavoritesOnly()" title="只看收藏">⭐ 收藏</button>
+                <button class="btn-search" onclick="refreshPage()" title="刷新">🔄</button>
+            </div>
+        </div>
+        
+        <!-- 分类标签栏 -->
+        <div class="tags-bar" id="tagsBar" style="display: none;">
+            <span class="tags-label">🏷️ 分类：</span>
+            <button class="tag-btn tag-all active" onclick="filterByTag('all')">全部</button>
+            <span id="tagList" style="display: flex; gap: 8px; flex-wrap: wrap;"></span>
+            <button class="tag-btn tag-add" onclick="showTagManager()">➕ 管理标签</button>
+        </div>
+        
+        <!-- 批量选择提示 -->
+        <div class="toolbar" style="margin-top: -10px; margin-bottom: 10px;">
+            <div class="select-all-wrapper">
+                <input type="checkbox" id="selectAll" class="video-checkbox" onchange="toggleAllSelect()">
+                <label for="selectAll">全选 / 批量操作</label>
+            </div>
+        </div>
+        
+        <!-- 视频网格 -->
+        <div class="video-grid" id="videoGrid">
+            {% for video in videos %}
+            <div class="video-card" data-name="{{ video }}" data-tags='[]'>
+                <div style="position: absolute; top: 10px; left: 10px; z-index: 10;">
+                    <input type="checkbox" class="video-checkbox" data-filename="{{ video }}" onchange="toggleSelect('{{ video }}')" style="width: 22px; height: 22px; cursor: pointer; accent-color: #e94560;">
+                </div>
+                <div class="video-thumbnail" onclick="openPlayerProtected('{{ video }}')" 
+                     onmouseenter="showPreview(this, '{{ video }}')" 
+                     onmouseleave="hidePreview(this)">
+                    <!-- 静态缩略图 -->
+                    <img class="thumb-static" src="/thumbnails/{{ video_data[loop.index0].filename.rsplit('.', 1)[0] }}.jpg" 
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'" 
+                         alt="{{ video }}">
+                    <!-- GIF 预览（悬停时显示） -->
+                    <img class="thumb-preview" src="/previews/{{ video_data[loop.index0].filename.rsplit('.', 1)[0] }}.gif" 
+                         style="display: none;" 
+                         alt="{{ video }}">
+                    <div class="play-overlay" style="display: none;">
+                        <div class="play-icon">▶️</div>
+                    </div>
+                    <div class="video-duration">{{ video_data[loop.index0].duration if video_data else '--:--' }}</div>
+                </div>
+                <div class="video-info">
+                    <div class="video-title" title="{{ video }}">{{ video }}</div>
+                    <div class="video-meta">
+                        <span class="video-size">💾 {{ video_data[loop.index0].size_mb if video_data else '?' }} MB</span>
+                        <span class="video-resolution">📐 {{ video_data[loop.index0].resolution if video_data else '?' }}</span>
+                    </div>
+                    <!-- 标签区域 -->
+                    <div class="video-tags" id="tags-{{ loop.index0 }}">
+                        <span class="tag-placeholder" onclick="showTagManager('{{ video }}', {{ loop.index0 }})">➕ 添加标签</span>
+                    </div>
+                    <div class="video-actions">
+                        <button class="btn-play" onclick="openPlayer('{{ video }}')">▶️ 播放</button>
+                        <button class="btn-download" onclick="downloadVideo('{{ video }}')">📥 下载</button>
+                        <button class="btn-favorite" data-filename="{{ video }}" onclick="toggleFavorite('{{ video }}')">☆ 收藏</button>
+                        <button class="btn-playlist-add" onclick="addToPlaylist('{{ video }}')">📋 合集</button>
+                        <button class="btn-description" onclick="showDescription('{{ video }}', {{ loop.index0 }})">📝 备注</button>
+                        <button class="btn-settings" onclick="showVideoSettings('{{ video }}', {{ loop.index0 }})">⚙️ 设置</button>
+                        <button class="btn-info" onclick="showVideoInfo('{{ video }}')">ℹ️ 详情</button>
+                        <button class="btn-delete" onclick="deleteVideo('{{ video }}')">🗑️ 删除</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        {% if total == 0 %}
+        <div class="empty-state">
+            <div class="empty-icon">📹</div>
+            <h2>还没有视频</h2>
+            <p>上传你的第一个视频开始吧！支持 mp4, webm, mov, avi 等格式</p>
+        </div>
+        {% endif %}
+        
+        <!-- 分页导航 -->
+        {% if total_pages > 1 %}
+        <div class="pagination">
+            <div class="page-info">第 {{ page }} 页 / 共 {{ total_pages }} 页 (共 {{ total }} 个视频)</div>
+            <div class="page-controls">
+                {% if page > 1 %}
+                <a href="?page={{ page - 1 }}" class="btn-page">⬅️ 上一页</a>
+                {% endif %}
+                
+                <div class="page-jump">
+                    <input type="number" id="pageInput" min="1" max="{{ total_pages }}" value="{{ page }}">
+                    <button onclick="jumpToPage()" class="btn-page">跳转</button>
+                </div>
+                
+                {% if page < total_pages %}
+                <a href="?page={{ page + 1 }}" class="btn-page">下一页 ➡️</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 视频详情模态框 -->
+    <div class="modal info-modal" id="infoModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3>📊 视频信息</h3>
+                <span class="close-btn" onclick="closeInfoModal()">&times;</span>
+            </div>
+            <div class="modal-body" id="infoModalBody">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 标签管理模态框 -->
+    <div class="modal info-modal" id="tagModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3>🏷️ 管理标签</h3>
+                <span class="close-btn" onclick="closeTagModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="tagModalContent">
+                    <div class="loading">加载中...</div>
+                </div>
+                <div style="margin-top: 20px;">
+                    <label style="color: #888; font-size: 14px;">添加新标签：</label>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <input type="text" id="newTagInput" placeholder="输入标签名，回车添加" 
+                               style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #fff;"
+                               onkeypress="if(event.key==='Enter') addNewTag()">
+                        <button class="btn-search" onclick="addNewTag()">添加</button>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <label style="color: #888; font-size: 14px;">常用标签：</label>
+                    <div id="commonTags" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 视频描述/备注模态框 -->
+    <div class="modal info-modal" id="descModal">
+        <div class="modal-dialog" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>📝 视频描述</h3>
+                <span class="close-btn" onclick="closeDescModal()">&times;</span>
+            </div>
+            <div class="modal-body" style="max-height: 70vh;">
+                <div id="descModalContent">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 播放列表模态框 -->
+    <div class="modal info-modal" id="playlistModal">
+        <div class="modal-dialog" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>📋 播放列表</h3>
+                <span class="close-btn" onclick="closePlaylistModal()">&times;</span>
+            </div>
+            <div class="modal-body" style="max-height: 70vh;">
+                <div id="playlistModalContent">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 观看历史模态框 -->
+    <div class="modal info-modal" id="historyModal">
+        <div class="modal-dialog" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>📜 观看历史</h3>
+                <span class="close-btn" onclick="closeHistoryModal()">&times;</span>
+            </div>
+            <div class="modal-body" style="max-height: 70vh;">
+                <div id="historyModalContent">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 统计分析模态框 -->
+    <div class="modal info-modal" id="statsModal">
+        <div class="modal-dialog" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>📊 统计分析</h3>
+                <span class="close-btn" onclick="closeStatsModal()">&times;</span>
+            </div>
+            <div class="modal-body" style="max-height: 70vh;">
+                <div id="statsModalContent">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 视频设置模态框 -->
+    <div class="modal info-modal" id="settingsModal">
+        <div class="modal-dialog" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>⚙️ 视频设置</h3>
+                <span class="close-btn" onclick="closeSettingsModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="settingsModalContent">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 密码验证模态框 -->
+    <div class="modal info-modal password-input-modal" id="passwordModal" style="display: none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3>🔒 密码验证</h3>
+                <span class="close-btn" onclick="closePasswordModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="passwordModalContent">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 播放器模态框 -->
+    <div class="modal player-modal" id="playerModal">
+        <span class="close-btn" onclick="closePlayer()">&times;</span>
+        <div class="modal-content">
+            <div class="player-area">
+                <video id="videoPlayer" controls autoplay playsinline webkit-playsinline>
+                    <source src="" type="video/mp4">
+                    您的浏览器不支持视频播放
+                </video>
+                <div class="controls">
+                    <button class="btn-control" onclick="prevVideo()">⏮️</button>
+                    <button class="btn-control" onclick="togglePlayback()">⏯️</button>
+                    <button class="btn-control" onclick="toggleAudioMode()">🎵</button>
+                    <button class="btn-control" onclick="toggleFullscreen()">⛶</button>
+                    <button class="btn-control" onclick="minimizePlayer()">📱</button>
+                    <button class="btn-control" onclick="nextVideo()">⏭️</button>
+                    <button class="btn-control" onclick="toggleAutoplay()">🔁 <span id="autoplayStatus">开</span></button>
+                </div>
+            </div>
+            <div class="playlist-area">
+                <div class="playlist-header">📋 播放列表 <span id="playlistCount"></span></div>
+                <div id="playlist"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 快捷键提示 -->
+    <div class="shortcuts">
+        <strong>⌨️ 快捷键</strong><br>
+        <kbd>空格</kbd> 播放/暂停<br>
+        <kbd>←</kbd><kbd>→</kbd> 快退/进<br>
+        <kbd>↑</kbd><kbd>↓</kbd> 上/下个<br>
+        <kbd>F</kbd> 全屏<br>
+        <kbd>ESC</kbd> 关闭
+    </div>
+    
+    <!-- 批量操作栏 -->
+    <div class="batch-bar" id="batchBar">
+        <span style="color: #fff; font-weight: 600;">已选择 <span id="batchCount">0</span> 个视频</span>
+        <button class="batch-delete" id="batchSetPassword" onclick="batchSetPassword()">🔒 批量加密</button>
+        <button class="batch-delete" id="batchRemovePassword" onclick="batchRemovePassword()" style="background: rgba(255,152,0,0.8);">🔓 批量解密</button>
+        <button class="batch-delete" id="batchDelete" onclick="batchDelete()">🗑️ 批量删除</button>
+        <button class="batch-cancel" id="batchCancel" onclick="cancelBatch()">取消</button>
+    </div>
+    
+    <!-- 移动端底部导航 -->
+    <nav class="mobile-nav" id="mobileNav" style="display: none;">
+        <div class="mobile-nav-item active" onclick="mobileNavTo('home')">
+            <span class="icon">🏠</span>
+            <span>首页</span>
+        </div>
+        <div class="mobile-nav-item" onclick="mobileNavTo('upload')">
+            <span class="icon">📤</span>
+            <span>上传</span>
+        </div>
+        <div class="mobile-nav-item" onclick="mobileNavTo('history')">
+            <span class="icon">📜</span>
+            <span>历史</span>
+        </div>
+        <div class="mobile-nav-item" onclick="mobileNavTo('stats')">
+            <span class="icon">📊</span>
+            <span>统计</span>
+        </div>
+        <div class="mobile-nav-item" onclick="mobileNavTo('settings')">
+            <span class="icon">⚙️</span>
+            <span>设置</span>
+        </div>
+    </nav>
+    
+    <script>
+        window.videos = {{ videos | tojson }};
+        window.currentPage = {{ page }};
+        window.totalPages = {{ total_pages }};
+        window.totalVideos = {{ total }};
+        
+        // 加载统计信息
+        fetch('/api/stats')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('videoCount').textContent = `共 ${data.total_videos} 个视频`;
+                const size = data.total_size_gb >= 0.1 
+                    ? `${data.total_size_gb} GB` 
+                    : `${data.total_size_mb} MB`;
+                document.getElementById('storageStats').textContent = `| 💾 ${size}`;
+            });
+    </script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 数据文件
+*.json
+uploads/
+thumbnails/
+originals/
+
+# 日志
+flask.log
+*.log
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 敏感信息
+.env
+.key

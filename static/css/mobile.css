@@ -1,0 +1,517 @@
+/* ===== 移动端优化样式 ===== */
+
+/* 基础响应式增强 */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+    
+    /* Header 移动端优化 */
+    header {
+        flex-direction: column;
+        gap: 10px;
+        padding: 15px 0;
+    }
+    
+    .logo {
+        font-size: 24px;
+    }
+    
+    .stats {
+        width: 100%;
+        justify-content: center;
+        font-size: 12px;
+    }
+    
+    .stats .btn-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+    
+    /* 上传区域优化 */
+    .upload-section {
+        padding: 20px 15px;
+    }
+    
+    .file-label {
+        padding: 25px 15px;
+    }
+    
+    .file-icon {
+        font-size: 32px;
+    }
+    
+    .file-text {
+        font-size: 14px;
+    }
+    
+    .upload-options {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .btn-upload {
+        width: 100%;
+        padding: 15px;
+    }
+    
+    /* 工具栏优化 */
+    .toolbar {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .search-box {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .search-box input {
+        font-size: 14px;
+        padding: 10px 15px;
+    }
+    
+    .btn-search {
+        padding: 10px 15px;
+        font-size: 13px;
+    }
+    
+    .view-options {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    #sortSelect {
+        font-size: 13px;
+        padding: 10px 12px;
+    }
+    
+    /* 标签栏优化 */
+    .tags-bar {
+        padding: 10px 15px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+    }
+    
+    .tags-label {
+        display: none;
+    }
+    
+    .tag-btn {
+        flex-shrink: 0;
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+    
+    /* 视频网格优化 */
+    .video-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+    
+    .video-card {
+        border-radius: 12px;
+    }
+    
+    .video-thumbnail {
+        height: 140px;
+    }
+    
+    .video-info {
+        padding: 12px;
+    }
+    
+    .video-title {
+        font-size: 13px;
+        line-height: 1.4;
+    }
+    
+    .video-meta {
+        font-size: 11px;
+        gap: 8px;
+    }
+    
+    .video-tags {
+        gap: 4px;
+    }
+    
+    .video-tag {
+        padding: 2px 8px;
+        font-size: 10px;
+    }
+    
+    .tag-placeholder {
+        padding: 2px 8px;
+        font-size: 10px;
+    }
+    
+    .video-actions {
+        gap: 6px;
+    }
+    
+    .video-actions button {
+        padding: 8px;
+        font-size: 11px;
+        min-height: 36px;
+    }
+    
+    /* 分页优化 */
+    .pagination {
+        padding: 15px 10px;
+    }
+    
+    .page-info {
+        font-size: 13px;
+        margin-bottom: 15px;
+    }
+    
+    .page-controls {
+        gap: 10px;
+    }
+    
+    .btn-page {
+        padding: 10px 15px;
+        font-size: 13px;
+    }
+    
+    .page-jump input {
+        width: 50px;
+        padding: 10px;
+    }
+    
+    /* 模态框优化 */
+    .info-modal .modal-dialog {
+        width: 95%;
+        max-width: none;
+        margin: 10px;
+    }
+    
+    .info-modal .modal-header h3 {
+        font-size: 16px;
+    }
+    
+    .info-modal .modal-body {
+        padding: 15px;
+        max-height: 60vh;
+    }
+    
+    /* 播放器优化 */
+    .player-modal .modal-content {
+        flex-direction: column;
+    }
+    
+    .player-area {
+        height: 40vh;
+        padding: 10px;
+    }
+    
+    .player-area video {
+        max-width: 100%;
+        max-height: 60vh;
+    }
+    
+    .controls {
+        gap: 8px;
+    }
+    
+    .btn-control {
+        padding: 8px 12px;
+        font-size: 16px;
+        min-width: 40px;
+        min-height: 40px;
+    }
+    
+    .playlist-area {
+        width: 100%;
+        height: 35vh;
+        border-left: none;
+        border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .playlist-item {
+        padding: 12px 15px;
+    }
+    
+    .playlist-item-title {
+        font-size: 13px;
+    }
+    
+    .playlist-item-status {
+        font-size: 11px;
+    }
+    
+    /* 底部导航栏（移动端专用） */
+    .mobile-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: rgba(26,26,46,0.98);
+        border-top: 1px solid rgba(255,255,255,0.1);
+        padding: 8px 0;
+        padding-bottom: env(safe-area-inset-bottom);
+        z-index: 999;
+        justify-content: space-around;
+    }
+    
+    .mobile-nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 15px;
+        color: #888;
+        text-decoration: none;
+        font-size: 11px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .mobile-nav-item.active {
+        color: #e94560;
+    }
+    
+    .mobile-nav-item .icon {
+        font-size: 22px;
+    }
+    
+    /* 快捷键提示隐藏 */
+    .shortcuts {
+        display: none;
+    }
+    
+    /* Toast 优化 */
+    .toast {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        max-width: 90%;
+        text-align: center;
+    }
+    
+    /* 批量操作栏优化 */
+    .batch-bar {
+        width: 90%;
+        left: 50%;
+        bottom: 70px;
+        padding: 12px 20px;
+    }
+    
+    /* 描述模态框优化 */
+    .desc-tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    
+    .desc-tab {
+        flex-shrink: 0;
+        padding: 8px 14px;
+        font-size: 13px;
+    }
+    
+    .desc-editor {
+        font-size: 14px;
+        min-height: 120px;
+    }
+    
+    /* 历史项优化 */
+    .history-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .history-thumbnail {
+        width: 100%;
+        height: 120px;
+    }
+    
+    .history-info {
+        width: 100%;
+    }
+    
+    /* 统计图表优化 */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    
+    .stat-value {
+        font-size: 28px;
+    }
+    
+    .stat-label {
+        font-size: 12px;
+    }
+    
+    .bar-label {
+        width: 60px;
+        font-size: 11px;
+    }
+    
+    .bar-item {
+        gap: 8px;
+    }
+    
+    /* 设置项优化 */
+    .setting-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .setting-input {
+        width: 100%;
+    }
+    
+    /* 播放列表项优化 */
+    .playlist-card {
+        padding: 12px;
+    }
+    
+    .playlist-name {
+        font-size: 14px;
+    }
+    
+    .playlist-meta {
+        font-size: 11px;
+    }
+    
+    .playlist-video-tag {
+        font-size: 11px;
+        padding: 3px 8px;
+    }
+}
+
+/* 超小屏幕（< 480px） */
+@media (max-width: 480px) {
+    .video-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .video-thumbnail {
+        height: 180px;
+    }
+    
+    .video-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .video-actions button {
+        flex: 1;
+        min-width: calc(50% - 3px);
+    }
+    
+    .logo {
+        font-size: 20px;
+    }
+    
+    .stats {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .stats .btn-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+}
+
+/* 横屏优化 */
+@media (max-width: 896px) and (orientation: landscape) {
+    .player-area {
+        height: 100%;
+    }
+    
+    .playlist-area {
+        display: none;
+    }
+    
+    .video-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* 触摸优化 */
+@media (hover: none) and (pointer: coarse) {
+    /* 增大触摸目标 */
+    button, .btn-icon, .video-actions button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    /* 移除悬停效果（改为点击） */
+    .video-card:hover {
+        transform: none;
+    }
+    
+    .video-thumbnail:hover .play-overlay {
+        opacity: 0.8;
+    }
+    
+    /* 禁用 GIF 悬停预览（改用点击） */
+    .video-thumbnail:hover .thumb-static {
+        display: block !important;
+    }
+    
+    .video-thumbnail:hover .thumb-preview {
+        display: none !important;
+    }
+}
+
+/* 深色模式优化（移动端） */
+@media (prefers-color-scheme: dark) {
+    body:not(.light-theme) {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    }
+}
+
+/* 浅色模式优化（移动端） */
+@media (prefers-color-scheme: light) {
+    body.light-theme {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 50%, #b8c6db 100%);
+    }
+}
+
+/* 安全区域适配（iPhone X+） */
+@supports (padding: max(0px)) {
+    .mobile-nav {
+        padding-left: max(0px, env(safe-area-inset-left));
+        padding-right: max(0px, env(safe-area-inset-right));
+        padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+    
+    .container {
+        padding-left: max(10px, env(safe-area-inset-left));
+        padding-right: max(10px, env(safe-area-inset-right));
+    }
+}
+
+/* 动画优化（减少运动） */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* 打印样式 */
+@media print {
+    .mobile-nav, .upload-section, .video-actions, .toolbar, .pagination {
+        display: none !important;
+    }
+    
+    .video-grid {
+        display: block;
+    }
+    
+    .video-card {
+        break-inside: avoid;
+        margin-bottom: 20px;
+    }
+}

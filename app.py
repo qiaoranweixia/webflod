@@ -8,6 +8,7 @@ import os
 import uuid
 import json
 import subprocess
+import time
 from flask import Flask, request, redirect, url_for, send_from_directory, render_template, jsonify
 from werkzeug.utils import secure_filename
 from config import Config
@@ -138,6 +139,74 @@ def compress_video(input_path, output_path):
         return False, 0, 0, f"压缩错误：{str(e)}"
 
 
+def allowed_audio_file(filename):
+    """验证文件是否为允许的音频格式"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_AUDIO_EXTENSIONS']
+
+
+def compress_audio(input_path, output_path):
+    """
+    压缩音频文件
+    返回：(成功布尔值，原始大小 MB, 压缩后大小 MB, 消息)
+    """
+    try:
+        original_size = os.path.getsize(input_path)
+        
+        cmd = [
+            'ffmpeg',
+            '-i', input_path,
+            '-b:a', app.config['AUDIO_COMPRESSION_BITRATE'],
+            '-c:a', 'aac',
+            '-y',
+            output_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0 and os.path.exists(output_path):
+            compressed_size = os.path.getsize(output_path)
+            original_mb = round(original_size / 1024 / 1024, 1)
+            compressed_mb = round(compressed_size / 1024 / 1024, 1)
+            ratio = round((1 - compressed_size / original_size) * 100, 1)
+            
+            return True, original_mb, compressed_mb, f"压缩成功！减小 {ratio}%"
+        else:
+            return False, 0, 0, "压缩失败"
+            
+    except subprocess.TimeoutExpired:
+        return False, 0, 0, "压缩超时"
+    except Exception as e:
+        return False, 0, 0, f"压缩错误：{str(e)}"
+
+
+def get_audio_info(filepath):
+    """获取音频详细信息"""
+    info = {
+        'duration': 0,
+        'codec': 'unknown',
+        'bitrate': 0,
+        'sample_rate': 0
+    }
+    try:
+        result = subprocess.run(
+            ['ffprobe', '-v', 'error', '-show_entries', 
+             'stream=codec_name,bit_rate,sample_rate', '-of', 'json', filepath],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            if data.get('streams'):
+                stream = data['streams'][0]
+                info['codec'] = stream.get('codec_name', 'unknown')
+                info['bitrate'] = int(stream.get('bit_rate', 0) or 0)
+                info['sample_rate'] = int(stream.get('sample_rate', 0) or 0)
+        
+        info['duration'] = get_video_duration(filepath)  # ffprobe 对音频也适用
+    except:
+        pass
+    return info
+
+
 def generate_thumbnail(video_path, thumb_path):
     """生成视频缩略图"""
     try:
@@ -258,7 +327,7 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """文件上传处理（带压缩选项）"""
+    """文件上传处理（支持视频和音频）"""
     if 'file' not in request.files:
         return jsonify({'success': False, 'error': '没有文件'}), 400
     
@@ -268,25 +337,31 @@ def upload_file():
     compression_results = []
     
     for file in files:
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            unique_name = str(uuid.uuid4())[:8] + '_' + filename
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+        if not file or not file.filename:
+            continue
             
-            # 保存文件
-            file.save(filepath)
-            
-            # 压缩处理
-            if compress and app.config['COMPRESS_VIDEO']:
-                compressed_path = filepath + '.compressed.mp4'
-                success, orig_size, comp_size, msg = compress_video(filepath, compressed_path)
+        filename = secure_filename(file.filename)
+        unique_name = str(uuid.uuid4())[:8] + '_' + filename
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+        
+        # 保存文件
+        file.save(filepath)
+        
+        # 判断是视频还是音频
+        is_audio = allowed_audio_file(filename)
+        
+        # 压缩处理
+        if compress:
+            if is_audio and app.config.get('COMPRESS_AUDIO', True):
+                compressed_path = filepath + '.compressed.mp3'
+                success, orig_size, comp_size, msg = compress_audio(filepath, compressed_path)
                 
                 if success and comp_size < orig_size:
-                    # 保留压缩后的文件
                     os.remove(filepath)
                     os.rename(compressed_path, filepath)
                     compression_results.append({
                         'filename': unique_name,
+                        'type': 'audio',
                         'original': orig_size,
                         'compressed': comp_size,
                         'saved': round((1 - comp_size/orig_size) * 100, 1)
@@ -296,28 +371,51 @@ def upload_file():
                         os.remove(compressed_path)
                     compression_results.append({
                         'filename': unique_name,
+                        'type': 'audio',
                         'skipped': True,
                         'reason': msg
                     })
+                    
+            elif not is_audio and app.config['COMPRESS_VIDEO']:
+                compressed_path = filepath + '.compressed.mp4'
+                success, orig_size, comp_size, msg = compress_video(filepath, compressed_path)
+                
+                if success and comp_size < orig_size:
+                    os.remove(filepath)
+                    os.rename(compressed_path, filepath)
+                    compression_results.append({
+                        'filename': unique_name,
+                        'type': 'video',
+                        'original': orig_size,
+                        'compressed': comp_size,
+                        'saved': round((1 - comp_size/orig_size) * 100, 1)
+                    })
+                else:
+                    if os.path.exists(compressed_path):
+                        os.remove(compressed_path)
+                    compression_results.append({
+                        'filename': unique_name,
+                        'type': 'video',
+                        'skipped': True,
+                        'reason': msg
+                    })
+        
+        # 生成缩略图（仅视频）
+        if not is_audio and app.config['GENERATE_THUMBNAIL']:
+            thumb_name = os.path.splitext(unique_name)[0] + '.jpg'
+            thumb_path = os.path.join(app.config['THUMBNAIL_FOLDER'], thumb_name)
+            generate_thumbnail(filepath, thumb_path)
             
-            # 生成缩略图
-            if app.config['GENERATE_THUMBNAIL']:
-                thumb_name = os.path.splitext(unique_name)[0] + '.jpg'
-                thumb_path = os.path.join(app.config['THUMBNAIL_FOLDER'], thumb_name)
-                generate_thumbnail(filepath, thumb_path)
-            
-            # 生成预览 GIF（异步，不阻塞上传）
-            if app.config['GENERATE_THUMBNAIL']:
-                try:
-                    gif_name = os.path.splitext(unique_name)[0] + '.gif'
-                    gif_path = os.path.join(app.config['THUMBNAIL_FOLDER'], gif_name)
-                    # 在后台生成，不等待完成
-                    import threading
-                    threading.Thread(target=generate_preview_gif, args=(filepath, gif_path), daemon=True).start()
-                except Exception as e:
-                    print(f"GIF 生成线程失败：{e}")
-            
-            uploaded.append(unique_name)
+            # 生成预览 GIF（异步）
+            try:
+                gif_name = os.path.splitext(unique_name)[0] + '.gif'
+                gif_path = os.path.join(app.config['THUMBNAIL_FOLDER'], gif_name)
+                import threading
+                threading.Thread(target=generate_preview_gif, args=(filepath, gif_path), daemon=True).start()
+            except Exception as e:
+                print(f"GIF 生成线程失败：{e}")
+        
+        uploaded.append(unique_name)
     
     if uploaded:
         return jsonify({
@@ -331,6 +429,12 @@ def upload_file():
 @app.route('/videos/<filename>')
 def serve_video(filename):
     """视频文件服务"""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+@app.route('/audios/<filename>')
+def serve_audio(filename):
+    """音频文件服务"""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
@@ -1602,4 +1706,203 @@ if __name__ == '__main__':
     print(f"📱 局域网访问：http://<你的 IP>:{app.config['PORT']}")
     print("")
     
+# ===== 视频嗅探下载 API =====
+@app.route('/api/download', methods=['POST'])
+def download_video():
+    """视频下载 API"""
+    import subprocess
+    import os
+    import uuid
+    
+    data = request.json
+    url = data.get('url', '')
+    download_type = data.get('type', 'http')
+    auto_compress = data.get('autoCompress', True)
+    save_original = data.get('saveOriginal', False)
+    custom_filename = data.get('customFilename', '')
+    
+    if not url:
+        return jsonify({'success': False, 'error': '缺少视频链接'}), 400
+    
+    try:
+        # 生成文件名
+        if custom_filename:
+            filename = secure_filename(custom_filename)
+            if not filename.endswith('.mp4'):
+                filename += '.mp4'
+        else:
+            filename = f"{uuid.uuid4().hex[:8]}_video.mp4"
+        
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        # 根据类型选择下载方式
+        if download_type == 'http':
+            # 使用 wget 下载 HTTP 视频
+            cmd = ['wget', '-O', filepath, '--user-agent=Mozilla/5.0', url]
+        elif download_type == 'magnet':
+            # 使用 aria2c 下载磁力链接（优化配置，添加更多 tracker）
+            # 公共 tracker 列表
+            trackers = [
+                'udp://tracker.openbittorrent.com:80',
+                'udp://tracker.opentrackr.org:1337',
+                'udp://tracker.coppersurfer.tk:6969',
+                'udp://tracker.dler.org:6969',
+                'udp://open.stealth.si:80',
+                'udp://tracker.torrent.eu.org:451',
+                'udp://tracker.moeking.me:6969',
+                'udp://exodus.desync.com:6969',
+                'udp://tracker.internetwarriors.net:1337',
+                'wss://tracker.openwebtorrent.com',
+                'wss://tracker.btorrent.xyz',
+            ]
+            
+            cmd = ['aria2c', 
+                   '--dir=' + os.path.dirname(filepath), 
+                   '--out=' + os.path.basename(filepath),
+                   '--seed-time=0',
+                   '--max-connection-per-server=16',
+                   '--split=16',
+                   '--min-split-size=1M',
+                   '--connect-timeout=600',
+                   '--timeout=600',
+                   '--retry-wait=5',
+                   '--max-tries=20',
+                   '--continue=true',
+                   '--user-agent=Mozilla/5.0',
+                   '--enable-dht=true',
+                   '--enable-dht6=true',
+                   '--enable-peer-exchange=true',
+                   '--follow-torrent=true',
+                   '--listen-port=6881-6999',
+                   # 添加 tracker
+                   '--bt-tracker=' + ','.join(trackers),
+                   '--bt-request-peer-speed-limit=10M',
+                   '--bt-max-peers=100',
+                   url]
+        elif download_type == 'telegram':
+            # Telegram 下载（需要额外配置）
+            return jsonify({'success': False, 'error': 'Telegram 下载需要配置 API，敬请期待'}), 501
+        else:
+            return jsonify({'success': False, 'error': '不支持的下载类型'}), 400
+        
+        # 执行下载（带进度和超时）
+        if download_type == 'magnet':
+            # aria2c 带进度输出
+            cmd.extend(['--console-log-level=warn', '--summary-interval=1'])
+        
+        print(f"📥 开始下载...")
+        print(f"   命令：aria2c [参数] [磁链]")
+        print(f"   超时：10 分钟（磁力链接）或 30 分钟（HTTP）")
+        print("")
+        
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
+                                   universal_newlines=True, bufsize=1)
+        
+        # 实时读取输出
+        import threading
+        output_lines = []
+        last_progress_time = time.time()
+        no_progress_timeout = 600  # 10 分钟无进度超时
+        
+        def read_output():
+            for line in process.stdout:
+                output_lines.append(line)
+                last_progress_time = time.time()
+                # 显示进度
+                if 'DL:' in line or '#' in line or 'OK' in line:
+                    print(f"   {line.strip()}")
+        
+        thread = threading.Thread(target=read_output)
+        thread.daemon = True
+        thread.start()
+        
+        # 等待完成，带无进度超时
+        download_timeout = 600 if download_type == 'magnet' else 1800  # 磁力 10 分钟，HTTP 30 分钟
+        
+        try:
+            while process.poll() is None:
+                elapsed = time.time() - last_progress_time
+                if elapsed > no_progress_timeout:
+                    print(f"❌ {no_progress_timeout}秒无进度，终止下载")
+                    process.kill()
+                    return jsonify({'success': False, 'error': f'下载卡住（{no_progress_timeout}秒无进度），可能是冷门资源'}), 500
+                
+                if elapsed > download_timeout:
+                    print(f"❌ 下载超时（{download_timeout}秒）")
+                    process.kill()
+                    return jsonify({'success': False, 'error': f'下载超时（{download_timeout}秒）'}), 500
+                
+                time.sleep(5)
+            
+        except KeyboardInterrupt:
+            process.kill()
+            return jsonify({'success': False, 'error': '用户取消下载'}), 500
+        
+        thread.join(timeout=5)
+        
+        if process.returncode != 0:
+            error_msg = ''.join(output_lines[-20:]) if output_lines else '未知错误'
+            print(f"❌ 下载失败：{error_msg}")
+            return jsonify({'success': False, 'error': f'下载失败：{error_msg[:200]}'}), 500
+        
+        # 检查文件是否下载完成
+        if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
+            # 尝试查找 aria2 下载的实际文件（可能是 .torrent 文件）
+            torrent_file = filepath + '.torrent'
+            if os.path.exists(torrent_file):
+                print(f"⚠️  只下载了 torrent 文件，尝试继续下载...")
+                # 使用 aria2c 下载 torrent 内容
+                cmd2 = ['aria2c',
+                       '--dir=' + os.path.dirname(filepath),
+                       '--out=' + os.path.basename(filepath),
+                       '--seed-time=0',
+                       '--max-connection-per-server=16',
+                       '--split=16',
+                       '--connect-timeout=120',
+                       '--timeout=1800',
+                       torrent_file]
+                
+                result = subprocess.run(cmd2, capture_output=True, text=True, timeout=7200)
+                if result.returncode != 0:
+                    return jsonify({'success': False, 'error': f'Torrent 下载失败：{result.stderr[:200]}'}), 500
+        
+        # 获取文件大小
+        file_size = os.path.getsize(filepath) if os.path.exists(filepath) else 0
+        
+        # 自动压缩
+        if auto_compress and download_type == 'http':
+            compressed_path = filepath + '.compressed.mp4'
+            success, orig_size, comp_size, msg = compress_video(filepath, compressed_path)
+            
+            if success and comp_size < orig_size:
+                if not save_original:
+                    os.remove(filepath)
+                    os.rename(compressed_path, filepath)
+                file_size = os.path.getsize(filepath)
+            else:
+                if os.path.exists(compressed_path):
+                    os.remove(compressed_path)
+        
+        # 生成缩略图
+        try:
+            thumbnail_path = os.path.join(app.config['THUMBNAIL_FOLDER'], filename.rsplit('.', 1)[0] + '.jpg')
+            generate_thumbnail(filepath, thumbnail_path)
+        except Exception as e:
+            print(f"生成缩略图失败：{e}")
+        
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'size': file_size,
+            'message': '下载成功'
+        })
+        
+    except subprocess.TimeoutExpired:
+        process.kill()
+        return jsonify({'success': False, 'error': '下载超时'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+if __name__ == '__main__':
     app.run(host=app.config['HOST'], port=app.config['PORT'], debug=app.config['DEBUG'])

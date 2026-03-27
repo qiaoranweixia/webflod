@@ -22,7 +22,34 @@ let currentSettingsVideo = null;
 let currentSettingsIndex = null;
 
 // ===== 初始化 =====
+
+// 图片懒加载
+function initLazyLoading() {
+    if ('IntersectionObserver' in window) {
+        const lazyImages = document.querySelectorAll('img[loading="lazy"]');
+        
+        const imageObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    if (img.dataset.src) {
+                        img.src = img.dataset.src;
+                        img.removeAttribute('loading');
+                        imageObserver.unobserve(img);
+                    }
+                }
+            });
+        });
+        
+        lazyImages.forEach(img => imageObserver.observe(img));
+    }
+}
+
+// DOMContentLoaded 事件监听器
 document.addEventListener('DOMContentLoaded', function() {
+    // 图片懒加载
+    initLazyLoading();
+    
     // 文件选择显示
     const fileInput = document.getElementById('file');
     const fileInfo = document.getElementById('fileInfo');
@@ -102,6 +129,128 @@ function loadTheme() {
 }
 
 // ===== 上传处理 =====
+let uploadStartTime = 0;
+let selectedFiles = []; // 存储选中的文件
+
+// 文件列表管理
+function updateFileList(files) {
+    const preview = document.getElementById('fileListPreview');
+    const fileList = document.getElementById('fileList');
+    const fileCount = document.getElementById('fileCount');
+    const fileListSummary = document.getElementById('fileListSummary');
+    
+    if (!files || files.length === 0) {
+        if (preview) preview.style.display = 'none';
+        return;
+    }
+    
+    // 显示预览区域
+    if (preview) preview.style.display = 'block';
+    if (fileCount) fileCount.textContent = files.length;
+    
+    // 计算总大小和总时长
+    let totalSize = 0;
+    let totalDuration = 0;
+    let videoCount = 0;
+    
+    files.forEach(file => {
+        totalSize += file.size;
+        if (file.duration) {
+            totalDuration += file.duration;
+            videoCount++;
+        }
+    });
+    
+    // 更新摘要
+    const sizeStr = totalSize > 1024 * 1024 * 1024 
+        ? `${(totalSize / 1024 / 1024 / 1024).toFixed(2)} GB`
+        : `${(totalSize / 1024 / 1024).toFixed(2)} MB`;
+    
+    const durationStr = videoCount > 0 
+        ? `总时长：${formatDuration(totalDuration)}`
+        : '时长计算中...';
+    
+    if (fileListSummary) {
+        fileListSummary.innerHTML = `
+            <strong>💾 总大小：${sizeStr}</strong> | 
+            <strong>📹 视频：${videoCount}/${files.length}</strong> | 
+            <strong>${durationStr}</strong>
+        `;
+    }
+    
+    // 更新文件列表
+    if (fileList) {
+        fileList.innerHTML = '';
+        Array.from(files).forEach((file, index) => {
+            const li = document.createElement('li');
+            li.className = 'file-list-item';
+            
+            const sizeStr = file.size > 1024 * 1024 
+                ? `${(file.size / 1024 / 1024).toFixed(2)} MB`
+                : `${(file.size / 1024).toFixed(2)} KB`;
+            
+            const durationStr = file.duration ? formatDuration(file.duration) : '--:--';
+            
+            li.innerHTML = `
+                <span class="file-item-icon">🎬</span>
+                <div class="file-item-info">
+                    <div class="file-item-name" title="${file.name}">${file.name}</div>
+                    <div class="file-item-meta">
+                        <span class="file-item-size">💾 ${sizeStr}</span>
+                        <span class="file-item-duration">⏱️ ${durationStr}</span>
+                    </div>
+                </div>
+                <button type="button" class="file-item-remove" onclick="removeFile(${index})" title="移除文件">
+                    ×
+                </button>
+            `;
+            
+            fileList.appendChild(li);
+        });
+    }
+}
+
+// 移除单个文件
+function removeFile(index) {
+    if (index >= 0 && index < selectedFiles.length) {
+        selectedFiles.splice(index, 1);
+        
+        // 更新文件输入
+        const fileInput = document.getElementById('file');
+        const dataTransfer = new DataTransfer();
+        selectedFiles.forEach(file => dataTransfer.items.add(file));
+        fileInput.files = dataTransfer.files;
+        
+        // 更新列表显示
+        updateFileList(selectedFiles);
+        
+        // 如果全部移除，隐藏预览
+        if (selectedFiles.length === 0) {
+            document.getElementById('fileListPreview').style.display = 'none';
+        }
+        
+        showToast(`已移除 1 个文件`, 'info');
+    }
+}
+
+// 清空所有文件
+function clearAllFiles() {
+    selectedFiles = [];
+    const fileInput = document.getElementById('file');
+    fileInput.value = '';
+    document.getElementById('fileListPreview').style.display = 'none';
+    document.getElementById('fileInfo').innerHTML = '';
+    showToast('已清空所有文件', 'info');
+}
+
+// 格式化时长
+function formatDuration(seconds) {
+    if (!seconds || isNaN(seconds)) return '--:--';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 function handleUpload(e) {
     e.preventDefault();
     
@@ -140,14 +289,60 @@ function handleUpload(e) {
         uploadBtn.innerHTML = '<span class="spinner"></span> 上传中...';
     }
     
-    const xhr = new XMLHttpRequest();
+    // 记录开始时间
+    uploadStartTime = new Date().getTime();
     
-    // 进度监听
+    const xhr = new XMLHttpRequest();
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    // 重试函数
+    function retryUpload() {
+        if (retryCount < maxRetries) {
+            retryCount++;
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 10000); // 指数退避
+            
+            showToast(`网络不稳定，${delay/1000}秒后重试... (${retryCount}/${maxRetries})`, 'warning');
+            
+            setTimeout(() => {
+                uploadStartTime = new Date().getTime(); // 重置时间
+                xhr.send(formData);
+            }, delay);
+        } else {
+            showToast('上传失败，请检查网络连接后重试', 'error');
+            if (uploadBtn) {
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<span class="btn-text">⬆️ 重新上传</span>';
+            }
+        }
+    }
+    
+    // 进度监听（增强版：显示速度和剩余时间）
     xhr.upload.addEventListener('progress', function(e) {
         if (e.lengthComputable) {
             const percent = Math.round((e.loaded / e.total) * 100);
             const fill = document.getElementById('progressBarFill');
             if (fill) fill.style.width = percent + '%';
+            
+            // 计算上传速度和剩余时间
+            const currentTime = new Date().getTime();
+            const timeElapsed = (currentTime - uploadStartTime) / 1000; // 秒
+            const loadedMB = (e.loaded / (1024 * 1024)).toFixed(2);
+            const totalMB = (e.total / (1024 * 1024)).toFixed(2);
+            
+            if (timeElapsed > 0) {
+                const speedMBps = (e.loaded / timeElapsed / (1024 * 1024)).toFixed(2);
+                const remainingBytes = e.total - e.loaded;
+                const remainingSeconds = Math.ceil(remainingBytes / (e.loaded / timeElapsed));
+                
+                // 更新进度标签
+                if (progressLabel) {
+                    progressLabel.innerHTML = `已上传 ${loadedMB}/${totalMB} MB | ${speedMBps} MB/s`;
+                }
+                if (progressPercent) {
+                    progressPercent.textContent = `${percent}% | 剩余 ${remainingSeconds}秒`;
+                }
+            }
             if (progressPercent) progressPercent.textContent = percent + '%';
             if (progressLabel) progressLabel.textContent = `正在上传 (${Math.round(e.loaded / 1024 / 1024)} MB / ${Math.round(e.total / 1024 / 1024)} MB)`;
         }
@@ -192,14 +387,33 @@ function handleUpload(e) {
         }
     });
     
-    // 错误处理
+    // 错误处理（增强版：支持重试）
     xhr.addEventListener('error', function() {
         if (uploadBtn) {
             uploadBtn.disabled = false;
-            uploadBtn.innerHTML = '<span class="btn-text">⬆️ 开始上传</span>';
+            uploadBtn.innerHTML = '<span class="btn-text">⬆️ 重新上传</span>';
         }
-        showToast('网络错误，请重试', 'error');
+        
+        // 显示错误详情和重试按钮
+        const errorDetails = '网络错误，可能是服务器断开或网络不稳定';
+        showToast(errorDetails, 'error');
+        
+        // 触发重试
+        retryUpload();
     });
+    
+    // 超时处理
+    xhr.addEventListener('timeout', function() {
+        if (uploadBtn) {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<span class="btn-text">⬆️ 重新上传</span>';
+        }
+        showToast('上传超时，请重试', 'error');
+        retryUpload();
+    });
+    
+    // 设置超时时间（5 分钟）
+    xhr.timeout = 300000;
     
     xhr.open('POST', '/upload');
     xhr.send(formData);
@@ -486,7 +700,13 @@ function openPlayer(filename) {
     
     if (!modal || !video) return;
     
-    video.src = '/videos/' + encodeURIComponent(filename);
+    // 判断是否为音频文件
+    const audioExts = ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'wma'];
+    const ext = filename.split('.').pop().toLowerCase();
+    const isAudio = audioExts.includes(ext);
+    
+    // 设置正确的路径
+    video.src = isAudio ? '/audios/' + encodeURIComponent(filename) : '/videos/' + encodeURIComponent(filename);
     modal.style.display = 'block';
     
     // 记录播放次数
@@ -494,7 +714,7 @@ function openPlayer(filename) {
     
     // 重置状态
     isMinimized = false;
-    audioMode = false;
+    audioMode = isAudio;
     resetPlayerLayout();
     
     video.play().then(() => {
@@ -2673,3 +2893,464 @@ window.addEventListener('offline', () => {
     console.log('网络已断开');
     showToast('📡 当前离线，部分功能受限', 'warning');
 });
+
+// ===== 移动端优化 =====
+
+// 检测移动设备
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+// 移动端初始化
+if (isMobile()) {
+    document.addEventListener('DOMContentLoaded', function() {
+        // 添加移动端 class
+        document.body.classList.add('mobile-device');
+        
+        // 优化触摸体验
+        initMobileOptimizations();
+        
+        // 添加底部快捷操作栏（可选）
+        // addMobileQuickActions();
+    });
+}
+
+// 初始化移动端优化
+function initMobileOptimizations() {
+    // 防止双击缩放
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function(e) {
+        const now = Date.now();
+        if (now - lastTouchEnd <= 300) {
+            e.preventDefault();
+        }
+        lastTouchEnd = now;
+    }, false);
+    
+    // 优化滚动性能
+    const scrollableElements = document.querySelectorAll('.file-list, .video-grid');
+    scrollableElements.forEach(el => {
+        el.style.webkitOverflowScrolling = 'touch';
+    });
+    
+    // 图片懒加载（移动端更重要）
+    if ('IntersectionObserver' in window) {
+        const images = document.querySelectorAll('img');
+        const imageObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    if (img.dataset.src) {
+                        img.src = img.dataset.src;
+                        img.removeAttribute('loading');
+                        imageObserver.unobserve(img);
+                    }
+                }
+            });
+        });
+        images.forEach(img => imageObserver.observe(img));
+    }
+}
+
+// 添加移动端快捷操作栏
+function addMobileQuickActions() {
+    const quickActions = document.createElement('div');
+    quickActions.className = 'mobile-quick-actions';
+    quickActions.innerHTML = `
+        <button onclick="document.getElementById('file').click()">
+            <span class="icon">⬆️</span>
+            <span>上传</span>
+        </button>
+        <button onclick="showSearch()">
+            <span class="icon">🔍</span>
+            <span>搜索</span>
+        </button>
+        <button onclick="showPlaylists()">
+            <span class="icon">📋</span>
+            <span>列表</span>
+        </button>
+        <button onclick="toggleTheme()">
+            <span class="icon">🌓</span>
+            <span>主题</span>
+        </button>
+    `;
+    document.body.appendChild(quickActions);
+}
+
+// 移动端搜索
+function showSearch() {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.scrollIntoView({ behavior: 'smooth' });
+        searchInput.focus();
+    }
+}
+
+// 移动端视频卡片优化
+function optimizeVideoCardsForMobile() {
+    const cards = document.querySelectorAll('.video-card');
+    cards.forEach(card => {
+        // 添加触摸反馈
+        card.addEventListener('touchstart', function() {
+            this.style.transform = 'scale(0.98)';
+        });
+        card.addEventListener('touchend', function() {
+            this.style.transform = 'scale(1)';
+        });
+    });
+}
+
+// 移动端上传优化
+function optimizeMobileUpload() {
+    const fileInput = document.getElementById('file');
+    if (fileInput) {
+        // 移动端只允许选择视频
+        fileInput.setAttribute('accept', 'video/*');
+        
+        // 优化文件选择器
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files.length > 0) {
+                // 在移动端显示简化提示
+                showToast(`已选择 ${this.files.length} 个视频`, 'success');
+            }
+        });
+    }
+}
+
+// 移动端播放器优化
+function optimizeMobilePlayer() {
+    // 自动全屏播放
+    const videos = document.querySelectorAll('video');
+    videos.forEach(video => {
+        video.addEventListener('play', function() {
+            if (isMobile() && this.requestFullscreen) {
+                // 可选：自动全屏
+                // this.requestFullscreen();
+            }
+        });
+    });
+}
+
+// 移动端性能优化
+function optimizeMobilePerformance() {
+    // 减少同时加载的视频预览
+    if (isMobile()) {
+        const previews = document.querySelectorAll('.thumb-preview');
+        previews.forEach((preview, index) => {
+            if (index > 5) {
+                preview.setAttribute('loading', 'lazy');
+            }
+        });
+    }
+}
+
+// 手势支持（可选）
+function initGestures() {
+    if (!isMobile()) return;
+    
+    let touchStartX = 0;
+    let touchEndX = 0;
+    
+    document.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, false);
+    
+    document.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe(touchStartX, touchEndX);
+    }, false);
+    
+    function handleSwipe(start, end) {
+        const diff = start - end;
+        if (Math.abs(diff) > 50) {
+            if (diff > 0) {
+                // 左滑
+                console.log('左滑');
+            } else {
+                // 右滑
+                console.log('右滑');
+            }
+        }
+    }
+}
+
+// 网络状态检测（移动端重要）
+function checkNetworkStatus() {
+    if ('connection' in navigator) {
+        const connection = navigator.connection;
+        const effectiveType = connection.effectiveType;
+        
+        // 根据网络类型优化
+        if (effectiveType === '2g' || effectiveType === 'slow-2g') {
+            showToast('⚠️ 网络较慢，建议关闭压缩', 'warning');
+            // 可以自动关闭视频压缩
+            // document.getElementById('compressCheck').checked = false;
+        }
+    }
+}
+
+// 初始化
+if (isMobile()) {
+    optimizeMobileUpload();
+    optimizeMobilePlayer();
+    optimizeMobilePerformance();
+    checkNetworkStatus();
+    // initGestures(); // 可选手势
+}
+
+// 横屏检测
+window.addEventListener('orientationchange', function() {
+    if (isMobile()) {
+        // 横屏时优化布局
+        if (window.orientation === 90 || window.orientation === -90) {
+            document.body.classList.add('landscape-mode');
+        } else {
+            document.body.classList.remove('landscape-mode');
+        }
+    }
+});
+
+// 移动端字体大小调整
+function adjustMobileFontSize() {
+    if (isMobile()) {
+        const fontSize = Math.min(Math.max(window.innerWidth / 30, 14), 18);
+        document.documentElement.style.fontSize = fontSize + 'px';
+    }
+}
+
+if (isMobile()) {
+    adjustMobileFontSize();
+    window.addEventListener('resize', adjustMobileFontSize);
+}
+
+// ===== 视频嗅探下载功能 =====
+let currentDownloaderType = 'http';
+let downloadHistory = JSON.parse(localStorage.getItem('downloadHistory') || '[]');
+
+// 显示视频下载器
+function showVideoDownloader() {
+    const modal = document.getElementById('videoDownloaderModal');
+    if (modal) {
+        modal.style.display = 'block';
+        loadDownloadHistory();
+    }
+}
+
+// 关闭视频下载器
+function closeVideoDownloader() {
+    const modal = document.getElementById('videoDownloaderModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// 设置下载器类型
+function setDownloaderType(type) {
+    currentDownloaderType = type;
+    
+    // 更新按钮状态
+    document.querySelectorAll('#videoDownloaderModal .btn-search').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.getElementById('type' + type.charAt(0).toUpperCase() + type.slice(1)).classList.add('active');
+    
+    // 更新提示
+    const input = document.getElementById('videoUrlInput');
+    const help = document.getElementById('urlHelp');
+    
+    if (type === 'http') {
+        input.placeholder = '粘贴视频链接（HTTP/HTTPS）...';
+        help.innerHTML = '支持：MP4、WebM、FLV、AVI、MKV 等格式<br>示例：https://example.com/video.mp4';
+    } else if (type === 'magnet') {
+        input.placeholder = '粘贴磁力链接...';
+        help.innerHTML = '支持：magnet:?xt=urn:btih:...<br>需要安装 aria2';
+    } else if (type === 'telegram') {
+        input.placeholder = '粘贴 Telegram 消息链接...';
+        help.innerHTML = '支持：https://t.me/...<br>需要配置 Telegram API';
+    }
+}
+
+// 开始下载
+async function startDownload() {
+    const url = document.getElementById('videoUrlInput').value.trim();
+    const autoCompress = document.getElementById('autoCompress').checked;
+    const saveOriginal = document.getElementById('saveOriginal').checked;
+    const customFilename = document.getElementById('customFilename').value.trim();
+    
+    if (!url) {
+        showToast('请输入视频链接', 'error');
+        return;
+    }
+    
+    // 验证链接
+    if (currentDownloaderType === 'http' && !url.match(/^https?:\/\//i)) {
+        showToast('请输入有效的 HTTP/HTTPS 链接', 'error');
+        return;
+    }
+    
+    if (currentDownloaderType === 'magnet' && !url.match(/^magnet:\?/i)) {
+        showToast('请输入有效的磁力链接', 'error');
+        return;
+    }
+    
+    // 禁用按钮
+    const btn = document.getElementById('downloadBtn');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ 下载中...';
+    
+    // 显示进度
+    const progress = document.getElementById('downloadProgress');
+    progress.style.display = 'block';
+    
+    // 初始化进度显示
+    document.getElementById('downloadStatus').textContent = '正在连接...';
+    document.getElementById('downloadPercent').textContent = '0%';
+    document.getElementById('downloadBar').style.width = '0%';
+    document.getElementById('downloadInfo').textContent = '';
+    
+    // 模拟进度更新（因为 HTTP 请求是同步的）
+    let simulatedProgress = 0;
+    const progressInterval = setInterval(() => {
+        if (simulatedProgress < 90) {
+            simulatedProgress += Math.random() * 5;
+            updateDownloadProgress(simulatedProgress, '正在下载...');
+        }
+    }, 1000);
+    
+    try {
+        const response = await fetch('/api/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                url: url,
+                type: currentDownloaderType,
+                autoCompress: autoCompress,
+                saveOriginal: saveOriginal,
+                customFilename: customFilename
+            })
+        });
+        
+        // 清除模拟进度
+        clearInterval(progressInterval);
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // 更新为 100%
+            updateDownloadProgress(100, '下载完成！');
+            setTimeout(() => {
+                showToast('✅ 下载完成！', 'success');
+                addToDownloadHistory({
+                    url: url,
+                    filename: data.filename,
+                    size: data.size || 0,
+                    time: new Date().toISOString(),
+                    type: currentDownloaderType
+                });
+            }, 500);
+        } else {
+            updateDownloadProgress(0, '下载失败：' + data.error, true);
+            showToast('❌ 下载失败：' + data.error, 'error');
+        }
+    } catch (error) {
+        clearInterval(progressInterval);
+        updateDownloadProgress(0, '网络错误：' + error.message, true);
+        showToast('❌ 网络错误：' + error.message, 'error');
+    } finally {
+        // 恢复按钮
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = '⬇️ 开始下载';
+            progress.style.display = 'none';
+        }, 2000);
+    }
+}
+
+// 更新下载进度显示
+function updateDownloadProgress(percent, status, isError = false) {
+    const bar = document.getElementById('downloadBar');
+    const percentText = document.getElementById('downloadPercent');
+    const statusText = document.getElementById('downloadStatus');
+    
+    if (bar && percentText && statusText) {
+        bar.style.width = percent + '%';
+        percentText.textContent = Math.round(percent) + '%';
+        statusText.textContent = status;
+        
+        if (isError) {
+            bar.style.background = 'linear-gradient(90deg, #ff4444, #ff6b6b)';
+        } else {
+            bar.style.background = 'linear-gradient(90deg, #e94560, #ff6b6b)';
+        }
+    }
+}
+
+// 添加到下载历史
+function addToDownloadHistory(item) {
+    downloadHistory.unshift(item);
+    if (downloadHistory.length > 50) {
+        downloadHistory = downloadHistory.slice(0, 50);
+    }
+    localStorage.setItem('downloadHistory', JSON.stringify(downloadHistory));
+    loadDownloadHistory();
+}
+
+// 加载下载历史
+function loadDownloadHistory() {
+    const container = document.getElementById('downloadHistory');
+    if (!container) return;
+    
+    if (downloadHistory.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #888; padding: 20px;">暂无下载记录</div>';
+        return;
+    }
+    
+    container.innerHTML = downloadHistory.map(item => `
+        <div style="padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.03); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.filename}</div>
+                <div style="font-size: 11px; color: #888; margin-top: 4px;">
+                    ${new Date(item.time).toLocaleString()} · ${formatFileSize(item.size)} · ${getTypeIcon(item.type)}
+                </div>
+            </div>
+            <button onclick="playDownloadedVideo('${item.filename}')" 
+                    style="padding: 8px 12px; background: rgba(233,69,96,0.2); color: #e94560; border: none; border-radius: 8px; cursor: pointer; font-size: 12px; margin-left: 10px;">
+                ▶️ 播放
+            </button>
+        </div>
+    `).join('');
+}
+
+function getTypeIcon(type) {
+    const icons = { 'http': '🌐', 'magnet': '🧲', 'telegram': '✈️' };
+    return icons[type] || '📁';
+}
+
+function formatFileSize(bytes) {
+    if (!bytes) return '? B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let i = 0;
+    while (bytes >= 1024 && i < units.length - 1) {
+        bytes /= 1024;
+        i++;
+    }
+    return bytes.toFixed(1) + ' ' + units[i];
+}
+
+function playDownloadedVideo(filename) {
+    window.location.href = '/?play=' + encodeURIComponent(filename);
+}
+
+// 点击模态框外部关闭
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('videoDownloaderModal');
+    if (modal && e.target === modal) {
+        closeVideoDownloader();
+    }
+});
+
+// 初始化下载历史
+if (downloadHistory.length > 0) {
+    // 有历史记录，等待 DOM 加载后显示
+    document.addEventListener('DOMContentLoaded', loadDownloadHistory);
+}

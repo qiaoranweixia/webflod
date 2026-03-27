@@ -16,6 +16,11 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192x192.png">
     <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
     
+    <!-- 预加载关键资源 -->
+    <link rel="preload" href="/static/css/style.css" as="style">
+    <link rel="preload" href="/static/css/mobile.css" as="style">
+    <link rel="preload" href="/static/js/app.js" as="script">
+    
     <title>🎬 视频中心</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/mobile.css">
@@ -23,30 +28,45 @@
 <body>
     <div class="container">
         <header>
-            <div class="logo">🎬 视频中心</div>
-            <div class="stats">
+            <div class="logo" role="heading" aria-level="1">🎬 视频中心</div>
+            <div class="stats" role="status" aria-live="polite">
                 <span id="videoCount">共 {{ total }} 个视频</span>
                 <span id="storageStats"></span>
-                <button class="btn-icon" onclick="showPlaylists()" title="播放列表">📋</button>
-                <button class="btn-icon" onclick="showHistory()" title="观看历史">📜</button>
-                <button class="btn-icon" onclick="showStats()" title="统计分析">📊</button>
-                <button class="btn-icon" onclick="toggleTheme()" title="切换主题">🌓</button>
+                <button class="btn-icon" onclick="showPlaylists()" title="播放列表" aria-label="打开播放列表">📋</button>
+                <button class="btn-icon" onclick="showHistory()" title="观看历史" aria-label="查看观看历史">📜</button>
+                <button class="btn-icon" onclick="showStats()" title="统计分析" aria-label="查看统计">📊</button>
+                <button class="btn-icon" onclick="showVideoDownloader()" title="视频下载" aria-label="视频嗅探下载">📥</button>
+                <button class="btn-icon" onclick="toggleTheme()" title="切换主题" aria-label="切换深色浅色主题">🌓</button>
             </div>
         </header>
         
         <!-- 上传区域 -->
-        <div class="upload-section">
-            <h3 class="section-title">📤 上传视频</h3>
+        <div class="upload-section" role="region" aria-labelledby="uploadTitle">
+            <h3 class="section-title" id="uploadTitle">📤 上传视频/音频</h3>
             
-            <form class="upload-form" id="uploadForm" enctype="multipart/form-data">
+            <form class="upload-form" id="uploadForm" enctype="multipart/form-data" role="form" aria-label="视频/音频上传表单">
                 <div class="file-input-wrapper">
-                    <label for="file" class="file-label">
+                    <label for="file" class="file-label" aria-describedby="fileHelp">
                         <span class="file-icon">📁</span>
-                        <span class="file-text">点击选择视频文件</span>
+                        <span class="file-text">点击选择视频/音频文件</span>
                     </label>
-                    <input type="file" name="file" id="file" accept="video/*" multiple>
-                    <div class="file-info" id="fileInfo"></div>
+                    <input type="file" name="file" id="file" accept="video/*,audio/*" multiple 
+                           aria-label="选择视频或音频文件" 
+                           aria-describedby="fileHelp">
+                    <div id="fileHelp" class="visually-hidden">支持 MP4、WebM、OGG 等视频格式，以及 MP3、WAV、M4A 等音频格式，多个文件可同时上传</div>
                 </div>
+                
+                <!-- 文件列表预览 -->
+                <div class="file-list-preview" id="fileListPreview" style="display: none;">
+                    <div class="file-list-header">
+                        <span>📋 已选择 <strong id="fileCount">0</strong> 个文件</span>
+                        <button type="button" class="btn-clear-files" onclick="clearAllFiles()">清空全部</button>
+                    </div>
+                    <div class="file-list-summary" id="fileListSummary"></div>
+                    <ul class="file-list" id="fileList"></ul>
+                </div>
+                
+                <div class="file-info" id="fileInfo" role="status" aria-live="polite"></div>
                 
                 <div class="upload-options">
                     <label class="checkbox-label">
@@ -55,18 +75,29 @@
                     </label>
                 </div>
                 
-                <button type="submit" class="btn-upload" id="uploadBtn">
+                <button type="submit" class="btn-upload" id="uploadBtn" aria-label="开始上传视频">
                     <span class="btn-text">⬆️ 开始上传</span>
                 </button>
             </form>
             
             <!-- 上传进度 -->
-            <div class="progress-container" id="progressContainer">
+            <div class="progress-container" id="progressContainer" style="display: none;">
                 <div class="progress-header">
                     <span class="progress-label" id="progressLabel">准备上传...</span>
                     <span class="progress-percent" id="progressPercent">0%</span>
                 </div>
-                <div class="progress-bar" id="progressBar"></div>
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-bar-fill" id="progressBarFill" style="width: 0%"></div>
+                </div>
+                <div class="progress-stats" id="progressStats">
+                    <span class="stat-item">📊 <span id="uploadSize">0/0 MB</span></span>
+                    <span class="stat-item">⚡ <span id="uploadSpeed">0 MB/s</span></span>
+                    <span class="stat-item">⏱️ <span id="uploadETA">剩余 --</span></span>
+                    <span class="stat-item">📁 <span id="uploadFileCount">0/0</span></span>
+                </div>
+                <div class="current-file-info" id="currentFileInfo">
+                    <span class="current-file-name" id="currentFileName">--</span>
+                </div>
                 <div class="compression-result" id="compressionResult"></div>
             </div>
         </div>
@@ -92,7 +123,7 @@
         </div>
         
         <!-- 分类标签栏 -->
-        <div class="tags-bar" id="tagsBar" style="display: none;">
+        <div class="tags-bar" id="tagsBar">
             <span class="tags-label">🏷️ 分类：</span>
             <button class="tag-btn tag-all active" onclick="filterByTag('all')">全部</button>
             <span id="tagList" style="display: flex; gap: 8px; flex-wrap: wrap;"></span>
@@ -116,19 +147,27 @@
                 </div>
                 <div class="video-thumbnail" onclick="openPlayerProtected('{{ video }}')" 
                      onmouseenter="showPreview(this, '{{ video }}')" 
-                     onmouseleave="hidePreview(this)">
-                    <!-- 静态缩略图 -->
-                    <img class="thumb-static" src="/thumbnails/{{ video_data[loop.index0].filename.rsplit('.', 1)[0] }}.jpg" 
+                     onmouseleave="hidePreview(this)"
+                     role="button"
+                     tabindex="0"
+                     aria-label="播放视频：{{ video }}"
+                     onkeydown="if(event.key==='Enter') openPlayerProtected('{{ video }}')">
+                    <!-- 静态缩略图（懒加载） -->
+                    <img class="thumb-static" 
+                         src="/thumbnails/{{ video_data[loop.index0].filename.rsplit('.', 1)[0] }}.jpg" 
+                         loading="lazy"
                          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'" 
-                         alt="{{ video }}">
+                         alt="{{ video }} 缩略图">
                     <!-- GIF 预览（悬停时显示） -->
-                    <img class="thumb-preview" src="/previews/{{ video_data[loop.index0].filename.rsplit('.', 1)[0] }}.gif" 
+                    <img class="thumb-preview" 
+                         src="/previews/{{ video_data[loop.index0].filename.rsplit('.', 1)[0] }}.gif" 
+                         loading="lazy"
                          style="display: none;" 
-                         alt="{{ video }}">
+                         alt="{{ video }} 预览">
                     <div class="play-overlay" style="display: none;">
                         <div class="play-icon">▶️</div>
                     </div>
-                    <div class="video-duration">{{ video_data[loop.index0].duration if video_data else '--:--' }}</div>
+                    <div class="video-duration" aria-label="视频时长">{{ video_data[loop.index0].duration if video_data else '--:--' }}</div>
                 </div>
                 <div class="video-info">
                     <div class="video-title" title="{{ video }}">{{ video }}</div>
@@ -405,3 +444,79 @@
     <script src="/static/js/app.js"></script>
 </body>
 </html>
+
+        <!-- 视频嗅探下载模态框 -->
+        <div id="videoDownloaderModal" class="modal" style="display: none;">
+            <div class="modal-dialog" style="max-width: 800px; margin: 50px auto; background: rgba(20,20,40,0.98); border-radius: 20px;">
+                <div class="modal-header" style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0;">📥 视频嗅探下载</h3>
+                    <span class="close-btn" onclick="closeVideoDownloader()" style="font-size: 40px; cursor: pointer; opacity: 0.7;">&times;</span>
+                </div>
+                <div class="modal-body" style="padding: 30px;">
+                    <!-- 下载方式选择 -->
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 10px; font-weight: 600;">📋 下载类型：</label>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn-search active" onclick="setDownloaderType('http')" id="typeHttp">🌐 网页视频</button>
+                            <button class="btn-search" onclick="setDownloaderType('magnet')" id="typeMagnet">🧲 磁力链接</button>
+                            <button class="btn-search" onclick="setDownloaderType('telegram')" id="typeTelegram">✈️ Telegram</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 输入区域 -->
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 10px; font-weight: 600;">🔗 视频链接：</label>
+                        <input type="text" id="videoUrlInput" placeholder="粘贴视频链接..." 
+                               style="width: 100%; padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #fff; font-size: 14px;">
+                        <div id="urlHelp" style="margin-top: 10px; font-size: 12px; color: #888;">
+                            支持：MP4、WebM、FLV、AVI、MKV 等格式
+                        </div>
+                    </div>
+                    
+                    <!-- 高级选项 -->
+                    <details style="margin-bottom: 20px; background: rgba(255,255,255,0.03); border-radius: 10px; padding: 15px;">
+                        <summary style="cursor: pointer; font-weight: 600;">⚙️ 高级选项</summary>
+                        <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px;">
+                            <label style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" id="autoCompress" checked>
+                                <span>🗜️ 下载后自动压缩</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" id="saveOriginal">
+                                <span>📁 保留原始文件</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px;">
+                                <input type="text" id="customFilename" placeholder="自定义文件名（可选）" 
+                                       style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #fff; font-size: 13px;">
+                            </label>
+                        </div>
+                    </details>
+                    
+                    <!-- 下载按钮 -->
+                    <button onclick="startDownload()" id="downloadBtn" 
+                            style="width: 100%; padding: 15px; border-radius: 12px; border: none; background: linear-gradient(135deg, #e94560, #ff6b6b); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                        ⬇️ 开始下载
+                    </button>
+                    
+                    <!-- 下载进度 -->
+                    <div id="downloadProgress" style="margin-top: 20px; display: none;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span id="downloadStatus">准备下载...</span>
+                            <span id="downloadPercent">0%</span>
+                        </div>
+                        <div style="height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; overflow: hidden;">
+                            <div id="downloadBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #e94560, #ff6b6b); transition: width 0.3s;"></div>
+                        </div>
+                        <div id="downloadInfo" style="margin-top: 10px; font-size: 12px; color: #888;"></div>
+                    </div>
+                    
+                    <!-- 下载历史 -->
+                    <div style="margin-top: 30px;">
+                        <h4 style="margin-bottom: 15px; font-weight: 600;">📜 下载历史</h4>
+                        <div id="downloadHistory" style="max-height: 300px; overflow-y: auto;">
+                            <div style="text-align: center; color: #888; padding: 20px;">暂无下载记录</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>

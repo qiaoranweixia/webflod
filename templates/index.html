@@ -3,102 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#e94560">
+    <meta name="theme-color" content="#1c1c24">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="视频中心">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="format-detection" content="telephone=no">
-    <meta name="msapplication-tap-highlight" content="no">
-    
-    <!-- PWA -->
-    <link rel="manifest" href="/static/manifest.json">
-    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192x192.png">
-    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
-    
-    <!-- 预加载关键资源 -->
-    <link rel="preload" href="/static/css/style.css" as="style">
-    <link rel="preload" href="/static/css/mobile.css" as="style">
-    <link rel="preload" href="/static/js/app.js" as="script">
-    
     <title>🎬 视频中心</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/mobile.css">
+    
+    <style>
+        /* ==========================================================================
+           现代化视频网站核心样式 (深度自适应手机端 + 批量全功能)
+           ========================================================================== */
+        :root {
+            --bg-color: #0f0f13; --card-bg: #1c1c24;
+            --primary-color: #e50914; --primary-hover: #b80710;
+            --text-main: #ffffff; --text-muted: #a0a0a5;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --glass-bg: rgba(28, 28, 36, 0.7);
+            --radius: 12px; --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); padding-bottom: 120px; overflow-x: hidden; }
+
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 4%; background: var(--glass-bg);
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border-color);
+        }
+        .logo { font-size: 24px; font-weight: 800; color: var(--primary-color); letter-spacing: 1px; }
+        .stats { display: flex; gap: 15px; align-items: center; font-size: 14px; color: var(--text-muted); }
+        .btn-icon { background: transparent; border: none; font-size: 22px; cursor: pointer; transition: var(--transition); filter: grayscale(100%); opacity: 0.7; }
+        .btn-icon:hover { filter: grayscale(0%); opacity: 1; transform: scale(1.1); }
+
+        .container { max-width: 1600px; margin: 0 auto; padding: 20px 4%; }
+        .toolbar { display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; margin-bottom: 20px; align-items: center; }
+        .search-box { display: flex; flex: 1; min-width: 250px; gap: 10px; }
+        .search-box input { flex: 1; padding: 12px 20px; border-radius: 30px; border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.05); color: white; outline: none; transition: var(--transition); }
+        .search-box input:focus { border-color: var(--primary-color); background: rgba(255, 255, 255, 0.1); }
+        button.btn-search { padding: 10px 20px; border-radius: 30px; border: none; background: rgba(255, 255, 255, 0.1); color: white; cursor: pointer; transition: var(--transition); font-weight: 600; white-space: nowrap; }
+        button.btn-search:hover { background: rgba(255, 255, 255, 0.2); }
+        select { padding: 10px 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; font-size: 14px; outline: none;}
+        select option { background: var(--card-bg); }
+
+        .upload-section { background: rgba(255,255,255,0.02); padding: 20px; border-radius: 15px; border: 1px dashed var(--border-color); margin-bottom: 20px; }
+        .upload-form { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: space-between;}
+        .file-label { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 10px 20px; background: rgba(255,255,255,0.05); border-radius: 10px; border: 1px solid var(--border-color); transition: var(--transition); width: 100%; max-width: 300px; justify-content: center;}
+        input[type="file"] { display: none; }
+        .btn-upload { padding: 10px 25px; background: var(--primary-color); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 16px; transition: var(--transition);}
+        
+        .progress-container { margin-top: 15px; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px;}
+        .progress-bar { height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; overflow: hidden; margin: 10px 0;}
+        .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #e50914, #ff4b55); transition: width 0.3s; }
+        .progress-header { display: flex; justify-content: space-between; font-size: 14px; color: var(--text-muted);}
+
+        /* 正在查看合集的提示条 */
+        .playlist-notice {
+            display: none; background: rgba(229, 9, 20, 0.1); border: 1px solid var(--primary-color);
+            padding: 12px 20px; border-radius: 12px; margin-bottom: 20px; align-items: center; justify-content: space-between;
+        }
+
+        .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; margin-top: 10px; }
+        .video-card { background: var(--card-bg); border-radius: var(--radius); overflow: hidden; transition: var(--transition); position: relative; border: 1px solid var(--border-color); }
+        .video-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4); border-color: rgba(255, 255, 255, 0.2); }
+        .video-thumbnail { position: relative; width: 100%; padding-top: 56.25%; background: #000; cursor: pointer; overflow: hidden; }
+        .video-thumbnail img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s; }
+        .video-duration { position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.8); color: white; font-size: 12px; padding: 4px 8px; border-radius: 6px; font-weight: 600; z-index: 5;}
+        .play-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; opacity: 0; transition: var(--transition); z-index: 6;}
+        .video-card:hover .play-overlay { opacity: 1; }
+        .play-icon { font-size: 40px; text-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .video-checkbox { position: absolute; top: 10px; left: 10px; z-index: 10; width: 22px; height: 22px; cursor: pointer; accent-color: var(--primary-color);}
+
+        .video-info { padding: 12px; }
+        .video-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .video-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
+        
+        .video-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding-top: 10px; border-top: 1px solid var(--border-color); }
+        .video-actions button { padding: 6px 0; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; background: rgba(255,255,255,0.05); color: var(--text-main); }
+        .video-actions button:hover { background: rgba(255,255,255,0.15); }
+        .btn-play { background: rgba(229, 9, 20, 0.15) !important; color: #ff4b55 !important; grid-column: span 3; padding: 8px 0 !important; font-size: 14px !important; font-weight: bold;}
+        .btn-play:hover { background: var(--primary-color) !important; color: white !important; }
+
+        /* ===== 手机端深度适配 ===== */
+        @media (max-width: 768px) {
+            header { padding: 12px 15px; }
+            .logo { font-size: 20px; }
+            .stats-text { display: none; } 
+            .stats { gap: 10px; }
+            
+            .toolbar { flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 15px;}
+            .toolbar > div { width: 100%; justify-content: space-between;}
+            .search-box { width: 100%; }
+            .playlist-notice { flex-direction: column; gap: 10px; text-align: center;}
+            
+            .upload-form { flex-direction: column; align-items: stretch; }
+            .file-label { max-width: 100%; }
+
+            .video-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+            .video-info { padding: 8px; }
+            .video-title { font-size: 12px; margin-bottom: 4px;}
+            .video-meta { font-size: 10px; margin-bottom: 6px;}
+            
+            .video-actions { grid-template-columns: repeat(2, 1fr); gap: 5px; padding-top: 6px; }
+            .video-actions button { font-size: 11px; padding: 4px 0; }
+            .btn-play { grid-column: span 2; padding: 6px 0 !important; font-size: 12px !important;}
+            
+            .modal-dialog { width: 95%; margin: 20px auto; max-height: 90vh;}
+        }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; backdrop-filter: blur(5px); }
+        .modal-dialog { background: var(--card-bg); width: 90%; max-width: 600px; margin: 50px auto; border-radius: 15px; overflow: hidden; border: 1px solid var(--border-color); box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
+        .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 20px; max-height: 70vh; overflow-y: auto; }
+        .close-btn { font-size: 28px; cursor: pointer; color: var(--text-muted); line-height: 1;}
+        .close-btn:hover { color: white; }
+
+        #toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; width: 90%; max-width: 400px;}
+        .toast { background: var(--card-bg); color: white; padding: 12px 20px; border-radius: 8px; border-left: 4px solid var(--primary-color); box-shadow: 0 5px 15px rgba(0,0,0,0.5); text-align: center;}
+        
+        /* 批量操作工具栏美化 (自适应) */
+        .batch-bar { 
+            position: fixed; bottom: -150px; left: 50%; transform: translateX(-50%); 
+            background: var(--glass-bg); backdrop-filter: blur(15px); border: 1px solid var(--border-color); 
+            padding: 12px 20px; border-radius: 15px; display: flex; gap: 10px; align-items: center; 
+            z-index: 1000; transition: bottom 0.4s; width: 95%; max-width: 800px; justify-content: center; flex-wrap: wrap; box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        }
+        .batch-bar.show { bottom: 20px; }
+        .batch-bar button { padding: 8px 12px; border-radius: 8px; border: none; font-weight: bold; color:white; cursor:pointer; font-size: 13px;}
+
+        .player-modal .modal-dialog { max-width: 900px; background: #000; border: none;}
+        video { width: 100%; max-height: 75vh; background: #000; outline: none; border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;}
+        input[type="text"], input[type="password"], textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: white; margin-bottom: 15px; outline: none; }
+        .loading { text-align: center; color: #888; padding: 20px; }
+    </style>
 </head>
 <body>
+    <header>
+        <div class="logo">🎬 视频中心</div>
+        <div class="stats">
+            <span class="stats-text" id="videoCount">共 {{ total }} 个</span>
+            <span class="stats-text" id="storageStats"></span>
+            <button class="btn-icon" onclick="showMyPlaylists()" title="我的合集">📋</button>
+            <button class="btn-icon" onclick="showHistory()" title="观看历史">📜</button>
+            <button class="btn-icon" onclick="showStats()" title="统计分析">📊</button>
+            <button class="btn-icon" onclick="showVideoDownloader()" title="嗅探下载">📥</button>
+        </div>
+    </header>
+
     <div class="container">
-        <header>
-            <div class="logo" role="heading" aria-level="1">🎬 视频中心</div>
-            <div class="stats" role="status" aria-live="polite">
-                <span id="videoCount">共 {{ total }} 个视频</span>
-                <span id="storageStats"></span>
-                <button class="btn-icon" onclick="showPlaylists()" title="播放列表" aria-label="打开播放列表">📋</button>
-                <button class="btn-icon" onclick="showHistory()" title="观看历史" aria-label="查看观看历史">📜</button>
-                <button class="btn-icon" onclick="showStats()" title="统计分析" aria-label="查看统计">📊</button>
-                <button class="btn-icon" onclick="showVideoDownloader()" title="视频下载" aria-label="视频嗅探下载">📥</button>
-                <button class="btn-icon" onclick="toggleTheme()" title="切换主题" aria-label="切换深色浅色主题">🌓</button>
-            </div>
-        </header>
-        
         <!-- 上传区域 -->
-        <div class="upload-section" role="region" aria-labelledby="uploadTitle">
-            <h3 class="section-title" id="uploadTitle">📤 上传视频/音频</h3>
-            
-            <form class="upload-form" id="uploadForm" enctype="multipart/form-data" role="form" aria-label="视频/音频上传表单">
-                <div class="file-input-wrapper">
-                    <label for="file" class="file-label" aria-describedby="fileHelp">
-                        <span class="file-icon">📁</span>
-                        <span class="file-text">点击选择视频/音频文件</span>
-                    </label>
-                    <input type="file" name="file" id="file" accept="video/*,audio/*" multiple 
-                           aria-label="选择视频或音频文件" 
-                           aria-describedby="fileHelp">
-                    <div id="fileHelp" class="visually-hidden">支持 MP4、WebM、OGG 等视频格式，以及 MP3、WAV、M4A 等音频格式，多个文件可同时上传</div>
-                </div>
-                
-                <!-- 文件列表预览 -->
-                <div class="file-list-preview" id="fileListPreview" style="display: none;">
-                    <div class="file-list-header">
-                        <span>📋 已选择 <strong id="fileCount">0</strong> 个文件</span>
-                        <button type="button" class="btn-clear-files" onclick="clearAllFiles()">清空全部</button>
-                    </div>
-                    <div class="file-list-summary" id="fileListSummary"></div>
-                    <ul class="file-list" id="fileList"></ul>
-                </div>
-                
-                <div class="file-info" id="fileInfo" role="status" aria-live="polite"></div>
-                
-                <div class="upload-options">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="compressCheck" checked>
-                        <span>🗜️ 自动压缩 (节省空间，推荐)</span>
-                    </label>
-                </div>
-                
-                <button type="submit" class="btn-upload" id="uploadBtn" aria-label="开始上传视频">
-                    <span class="btn-text">⬆️ 开始上传</span>
-                </button>
+        <div class="upload-section">
+            <h3 style="margin-bottom: 15px; font-size: 16px;">📤 上传音视频</h3>
+            <form class="upload-form" id="uploadForm">
+                <label for="file" class="file-label">
+                    <span style="font-size: 20px;">📁</span> <span id="fileSelectionText">点击选择文件(多选)</span>
+                </label>
+                <input type="file" id="file" accept="video/*,audio/*" multiple onchange="document.getElementById('fileSelectionText').innerText = '已选 ' + this.files.length + ' 个'">
+                <label style="color: var(--text-muted); font-size: 13px;"><input type="checkbox" id="compressCheck" checked>自动压制体积</label>
+                <button type="submit" class="btn-upload" id="uploadBtn">⬆️ 开始上传</button>
             </form>
-            
-            <!-- 上传进度 -->
             <div class="progress-container" id="progressContainer" style="display: none;">
-                <div class="progress-header">
-                    <span class="progress-label" id="progressLabel">准备上传...</span>
-                    <span class="progress-percent" id="progressPercent">0%</span>
-                </div>
-                <div class="progress-bar" id="progressBar">
-                    <div class="progress-bar-fill" id="progressBarFill" style="width: 0%"></div>
-                </div>
-                <div class="progress-stats" id="progressStats">
-                    <span class="stat-item">📊 <span id="uploadSize">0/0 MB</span></span>
-                    <span class="stat-item">⚡ <span id="uploadSpeed">0 MB/s</span></span>
-                    <span class="stat-item">⏱️ <span id="uploadETA">剩余 --</span></span>
-                    <span class="stat-item">📁 <span id="uploadFileCount">0/0</span></span>
-                </div>
-                <div class="current-file-info" id="currentFileInfo">
-                    <span class="current-file-name" id="currentFileName">--</span>
-                </div>
-                <div class="compression-result" id="compressionResult"></div>
+                <div class="progress-header"><span id="progressLabel">准备中...</span><span><span id="uploadFileCount">0/0</span> | <span id="progressPercent">0%</span></span></div>
+                <div class="progress-bar"><div class="progress-bar-fill" id="progressBarFill"></div></div>
             </div>
         </div>
         
@@ -106,417 +172,356 @@
         <div class="toolbar">
             <div class="search-box">
                 <input type="text" id="searchInput" placeholder="🔍 搜索视频文件名...">
-                <button class="btn-search" onclick="filterVideos()">搜索</button>
-                <button class="btn-search btn-clear" onclick="clearSearch()">清空</button>
+                <button class="btn-search" onclick="clearSearch()">清空</button>
             </div>
-            
-            <div class="view-options" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <select id="sortSelect" onchange="sortVideos(this.value)" style="padding: 10px 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; font-size: 14px; min-height: 44px;">
-                    <option value="date" {% if request.args.get('sort') == 'date' %}selected{% endif %}>📅 按日期</option>
-                    <option value="name" {% if request.args.get('sort') == 'name' %}selected{% endif %}>🔤 按名称</option>
-                    <option value="size" {% if request.args.get('sort') == 'size' %}selected{% endif %}>💾 按大小</option>
-                    <option value="duration" {% if request.args.get('sort') == 'duration' %}selected{% endif %}>⏱️ 按时长</option>
-                </select>
-                <button class="btn-search" onclick="showFavoritesOnly()" title="只看收藏">⭐ 收藏</button>
-                <button class="btn-search" onclick="refreshPage()" title="刷新">🔄</button>
+            <div style="display: flex; gap: 10px; align-items: center; width: 100%; justify-content: space-between;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="selectAll" style="width:18px; height:18px; accent-color: var(--primary-color);" onchange="toggleAllSelect()">
+                    <label for="selectAll" style="font-size: 13px; color: #aaa;">开启批量操作</label>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <select id="sortSelect" onchange="location.href='?sort='+this.value">
+                        <option value="date" {% if request.args.get('sort') == 'date' %}selected{% endif %}>📅 按日期</option>
+                        <option value="size" {% if request.args.get('sort') == 'size' %}selected{% endif %}>💾 按大小</option>
+                    </select>
+                    <button class="btn-search" onclick="showFavoritesOnly()">⭐ 收藏</button>
+                </div>
             </div>
         </div>
-        
-        <!-- 分类标签栏 -->
-        <div class="tags-bar" id="tagsBar">
-            <span class="tags-label">🏷️ 分类：</span>
-            <button class="tag-btn tag-all active" onclick="filterByTag('all')">全部</button>
-            <span id="tagList" style="display: flex; gap: 8px; flex-wrap: wrap;"></span>
-            <button class="tag-btn tag-add" onclick="showTagManager()">➕ 管理标签</button>
-        </div>
-        
-        <!-- 批量选择提示 -->
-        <div class="toolbar" style="margin-top: -10px; margin-bottom: 10px;">
-            <div class="select-all-wrapper">
-                <input type="checkbox" id="selectAll" class="video-checkbox" onchange="toggleAllSelect()">
-                <label for="selectAll">全选 / 批量操作</label>
-            </div>
+
+        <!-- 查看合集状态提示条 -->
+        <div class="playlist-notice" id="playlistFilterNotice">
+            <span style="color: #ff4b55; font-weight: bold;">📍 正在查看合集：<span id="currentPlaylistName"></span></span>
+            <button class="btn-search" style="background: var(--primary-color);" onclick="clearSearch()">❌ 退出合集视图</button>
         </div>
         
         <!-- 视频网格 -->
         <div class="video-grid" id="videoGrid">
             {% for video in videos %}
-            <div class="video-card" data-name="{{ video }}" data-tags='[]'>
-                <div style="position: absolute; top: 10px; left: 10px; z-index: 10;">
-                    <input type="checkbox" class="video-checkbox" data-filename="{{ video }}" onchange="toggleSelect('{{ video }}')" style="width: 22px; height: 22px; cursor: pointer; accent-color: #e94560;">
-                </div>
-                <div class="video-thumbnail" onclick="openPlayerProtected('{{ video }}')" 
-                     onmouseenter="showPreview(this, '{{ video }}')" 
-                     onmouseleave="hidePreview(this)"
-                     role="button"
-                     tabindex="0"
-                     aria-label="播放视频：{{ video }}"
-                     onkeydown="if(event.key==='Enter') openPlayerProtected('{{ video }}')">
-                    <!-- 静态缩略图（懒加载） -->
-                    <img class="thumb-static" 
-                         src="/thumbnails/{{ video_data[loop.index0].filename.rsplit('.', 1)[0] }}.jpg" 
-                         loading="lazy"
-                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'" 
-                         alt="{{ video }} 缩略图">
-                    <!-- GIF 预览（悬停时显示） -->
-                    <img class="thumb-preview" 
-                         src="/previews/{{ video_data[loop.index0].filename.rsplit('.', 1)[0] }}.gif" 
-                         loading="lazy"
-                         style="display: none;" 
-                         alt="{{ video }} 预览">
-                    <div class="play-overlay" style="display: none;">
-                        <div class="play-icon">▶️</div>
-                    </div>
-                    <div class="video-duration" aria-label="视频时长">{{ video_data[loop.index0].duration if video_data else '--:--' }}</div>
+            <div class="video-card" data-name="{{ video }}">
+                <input type="checkbox" class="video-checkbox" data-filename="{{ video }}" onchange="toggleSelect('{{ video }}')">
+                <div class="video-thumbnail" onclick="openPlayerProtected('{{ video }}')" onmouseenter="showPreview(this)" onmouseleave="hidePreview(this)">
+                    <img class="thumb-static" src="/thumbnails/{{ video_data[loop.index0].filename.rsplit('.', 1)[0] }}.jpg" onerror="this.style.display='none';">
+                    <img class="thumb-preview" src="/previews/{{ video_data[loop.index0].filename.rsplit('.', 1)[0] }}.gif" style="display: none;">
+                    <div class="play-overlay"><div class="play-icon">▶️</div></div>
+                    <div class="video-duration">{{ video_data[loop.index0].duration if video_data else '--:--' }}</div>
                 </div>
                 <div class="video-info">
                     <div class="video-title" title="{{ video }}">{{ video }}</div>
                     <div class="video-meta">
-                        <span class="video-size">💾 {{ video_data[loop.index0].size_mb if video_data else '?' }} MB</span>
-                        <span class="video-resolution">📐 {{ video_data[loop.index0].resolution if video_data else '?' }}</span>
-                    </div>
-                    <!-- 标签区域 -->
-                    <div class="video-tags" id="tags-{{ loop.index0 }}">
-                        <span class="tag-placeholder" onclick="showTagManager('{{ video }}', {{ loop.index0 }})">➕ 添加标签</span>
+                        <span>💾 {{ video_data[loop.index0].size_mb if video_data else '?' }} MB</span>
+                        <span>📐 {{ video_data[loop.index0].resolution if video_data else '?' }}</span>
                     </div>
                     <div class="video-actions">
-                        <button class="btn-play" onclick="openPlayer('{{ video }}')">▶️ 播放</button>
-                        <button class="btn-download" onclick="downloadVideo('{{ video }}')">📥 下载</button>
+                        <button class="btn-play" onclick="openPlayerProtected('{{ video }}')">▶️ 播放</button>
+                        <button onclick="downloadVideo('{{ video }}')">📥 下载</button>
                         <button class="btn-favorite" data-filename="{{ video }}" onclick="toggleFavorite('{{ video }}')">☆ 收藏</button>
-                        <button class="btn-playlist-add" onclick="addToPlaylist('{{ video }}')">📋 合集</button>
-                        <button class="btn-description" onclick="showDescription('{{ video }}', {{ loop.index0 }})">📝 备注</button>
-                        <button class="btn-settings" onclick="showVideoSettings('{{ video }}', {{ loop.index0 }})">⚙️ 设置</button>
-                        <button class="btn-info" onclick="showVideoInfo('{{ video }}')">ℹ️ 详情</button>
-                        <button class="btn-delete" onclick="deleteVideo('{{ video }}')">🗑️ 删除</button>
+                        <button onclick="addToPlaylist('{{ video }}')">📋 加合集</button>
+                        <button onclick="showVideoSettings('{{ video }}')">⚙️ 设置</button>
+                        <button onclick="deleteVideo('{{ video }}')" style="color:#ff4444;">🗑️</button>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
-        
+
         {% if total == 0 %}
-        <div class="empty-state">
-            <div class="empty-icon">📹</div>
-            <h2>还没有视频</h2>
-            <p>上传你的第一个视频开始吧！支持 mp4, webm, mov, avi 等格式</p>
-        </div>
+        <div style="text-align: center; padding: 50px 20px; color: #888;"><h2>没有视频</h2><p>赶快上传吧！</p></div>
         {% endif %}
         
-        <!-- 分页导航 -->
         {% if total_pages > 1 %}
-        <div class="pagination">
-            <div class="page-info">第 {{ page }} 页 / 共 {{ total_pages }} 页 (共 {{ total }} 个视频)</div>
-            <div class="page-controls">
-                {% if page > 1 %}
-                <a href="?page={{ page - 1 }}" class="btn-page">⬅️ 上一页</a>
-                {% endif %}
-                
-                <div class="page-jump">
-                    <input type="number" id="pageInput" min="1" max="{{ total_pages }}" value="{{ page }}">
-                    <button onclick="jumpToPage()" class="btn-page">跳转</button>
-                </div>
-                
-                {% if page < total_pages %}
-                <a href="?page={{ page + 1 }}" class="btn-page">下一页 ➡️</a>
-                {% endif %}
+        <div style="text-align: center; margin-top: 30px; color: #aaa;">
+            <div style="margin-bottom: 10px; font-size:13px;">第 {{ page }} / {{ total_pages }} 页</div>
+            <div style="display: flex; justify-content: center; gap: 5px;">
+                {% if page > 1 %}<button onclick="location.href='?page={{ page - 1 }}'" class="btn-search">⬅️</button>{% endif %}
+                <input type="number" id="pageInput" min="1" max="{{ total_pages }}" value="{{ page }}" style="width: 50px; margin:0; text-align:center;">
+                <button onclick="location.href='?page='+document.getElementById('pageInput').value" class="btn-search">跳</button>
+                {% if page < total_pages %}<button onclick="location.href='?page={{ page + 1 }}'" class="btn-search">➡️</button>{% endif %}
             </div>
         </div>
         {% endif %}
     </div>
-    
-    <!-- 视频详情模态框 -->
-    <div class="modal info-modal" id="infoModal">
-        <div class="modal-dialog">
-            <div class="modal-header">
-                <h3>📊 视频信息</h3>
-                <span class="close-btn" onclick="closeInfoModal()">&times;</span>
-            </div>
-            <div class="modal-body" id="infoModalBody">
-                <div class="loading">加载中...</div>
-            </div>
-        </div>
+
+    <!-- 批量操作全能工具栏 -->
+    <div class="batch-bar" id="batchBar">
+        <span style="font-weight: 600; font-size:14px; margin-right:5px;">已选 <span id="batchCount" style="color:var(--primary-color)">0</span></span>
+        <button style="background: #ffaa00;" onclick="batchFavorite()">⭐ 收藏</button>
+        <button style="background: #00C851;" onclick="batchDownload()">📥 下载</button>
+        <button style="background: var(--primary-color);" onclick="batchAddToPlaylist()">📋 合集</button>
+        <button style="background: #ff4444;" onclick="batchDelete()">🗑️ 删除</button>
+        <button style="background: rgba(255,255,255,0.2);" onclick="cancelBatch()">取消</button>
     </div>
-    
-    <!-- 标签管理模态框 -->
-    <div class="modal info-modal" id="tagModal">
-        <div class="modal-dialog">
-            <div class="modal-header">
-                <h3>🏷️ 管理标签</h3>
-                <span class="close-btn" onclick="closeTagModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div id="tagModalContent">
-                    <div class="loading">加载中...</div>
-                </div>
-                <div style="margin-top: 20px;">
-                    <label style="color: #888; font-size: 14px;">添加新标签：</label>
-                    <div style="display: flex; gap: 10px; margin-top: 10px;">
-                        <input type="text" id="newTagInput" placeholder="输入标签名，回车添加" 
-                               style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #fff;"
-                               onkeypress="if(event.key==='Enter') addNewTag()">
-                        <button class="btn-search" onclick="addNewTag()">添加</button>
-                    </div>
-                </div>
-                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
-                    <label style="color: #888; font-size: 14px;">常用标签：</label>
-                    <div id="commonTags" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 视频描述/备注模态框 -->
-    <div class="modal info-modal" id="descModal">
-        <div class="modal-dialog" style="max-width: 700px;">
-            <div class="modal-header">
-                <h3>📝 视频描述</h3>
-                <span class="close-btn" onclick="closeDescModal()">&times;</span>
-            </div>
-            <div class="modal-body" style="max-height: 70vh;">
-                <div id="descModalContent">
-                    <div class="loading">加载中...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 播放列表模态框 -->
-    <div class="modal info-modal" id="playlistModal">
-        <div class="modal-dialog" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3>📋 播放列表</h3>
-                <span class="close-btn" onclick="closePlaylistModal()">&times;</span>
-            </div>
-            <div class="modal-body" style="max-height: 70vh;">
-                <div id="playlistModalContent">
-                    <div class="loading">加载中...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 观看历史模态框 -->
-    <div class="modal info-modal" id="historyModal">
-        <div class="modal-dialog" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3>📜 观看历史</h3>
-                <span class="close-btn" onclick="closeHistoryModal()">&times;</span>
-            </div>
-            <div class="modal-body" style="max-height: 70vh;">
-                <div id="historyModalContent">
-                    <div class="loading">加载中...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 统计分析模态框 -->
-    <div class="modal info-modal" id="statsModal">
-        <div class="modal-dialog" style="max-width: 800px;">
-            <div class="modal-header">
-                <h3>📊 统计分析</h3>
-                <span class="close-btn" onclick="closeStatsModal()">&times;</span>
-            </div>
-            <div class="modal-body" style="max-height: 70vh;">
-                <div id="statsModalContent">
-                    <div class="loading">加载中...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 视频设置模态框 -->
-    <div class="modal info-modal" id="settingsModal">
-        <div class="modal-dialog" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>⚙️ 视频设置</h3>
-                <span class="close-btn" onclick="closeSettingsModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div id="settingsModalContent">
-                    <div class="loading">加载中...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 密码验证模态框 -->
-    <div class="modal info-modal password-input-modal" id="passwordModal" style="display: none;">
-        <div class="modal-dialog">
-            <div class="modal-header">
-                <h3>🔒 密码验证</h3>
-                <span class="close-btn" onclick="closePasswordModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div id="passwordModalContent">
-                    <div class="loading">加载中...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
+
     <!-- 播放器模态框 -->
     <div class="modal player-modal" id="playerModal">
-        <span class="close-btn" onclick="closePlayer()">&times;</span>
-        <div class="modal-content">
-            <div class="player-area">
-                <video id="videoPlayer" controls autoplay playsinline webkit-playsinline>
-                    <source src="" type="video/mp4">
-                    您的浏览器不支持视频播放
-                </video>
-                <div class="controls">
-                    <button class="btn-control" onclick="prevVideo()">⏮️</button>
-                    <button class="btn-control" onclick="togglePlayback()">⏯️</button>
-                    <button class="btn-control" onclick="toggleAudioMode()">🎵</button>
-                    <button class="btn-control" onclick="toggleFullscreen()">⛶</button>
-                    <button class="btn-control" onclick="minimizePlayer()">📱</button>
-                    <button class="btn-control" onclick="nextVideo()">⏭️</button>
-                    <button class="btn-control" onclick="toggleAutoplay()">🔁 <span id="autoplayStatus">开</span></button>
-                </div>
+        <div class="modal-dialog">
+            <div class="modal-header" style="border:none; padding: 10px 15px;">
+                <h3 id="playerTitle" style="font-size:15px; margin:0; width:85%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">正在播放</h3>
+                <span class="close-btn" onclick="closePlayer()">&times;</span>
             </div>
-            <div class="playlist-area">
-                <div class="playlist-header">📋 播放列表 <span id="playlistCount"></span></div>
-                <div id="playlist"></div>
+            <div class="modal-body" style="padding:0;">
+                <video id="videoPlayer" controls autoplay playsinline></video>
             </div>
         </div>
     </div>
-    
-    <!-- 快捷键提示 -->
-    <div class="shortcuts">
-        <strong>⌨️ 快捷键</strong><br>
-        <kbd>空格</kbd> 播放/暂停<br>
-        <kbd>←</kbd><kbd>→</kbd> 快退/进<br>
-        <kbd>↑</kbd><kbd>↓</kbd> 上/下个<br>
-        <kbd>F</kbd> 全屏<br>
-        <kbd>ESC</kbd> 关闭
+
+    <!-- 公用模态框 -->
+    <div class="modal" id="commonModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="commonModalTitle" style="font-size:16px;">标题</h3>
+                <span class="close-btn" onclick="closeModal('commonModal')">&times;</span>
+            </div>
+            <div class="modal-body" id="commonModalContent"></div>
+        </div>
     </div>
-    
-    <!-- 批量操作栏 -->
-    <div class="batch-bar" id="batchBar">
-        <span style="color: #fff; font-weight: 600;">已选择 <span id="batchCount">0</span> 个视频</span>
-        <button class="batch-delete" id="batchSetPassword" onclick="batchSetPassword()">🔒 批量加密</button>
-        <button class="batch-delete" id="batchRemovePassword" onclick="batchRemovePassword()" style="background: rgba(255,152,0,0.8);">🔓 批量解密</button>
-        <button class="batch-delete" id="batchDelete" onclick="batchDelete()">🗑️ 批量删除</button>
-        <button class="batch-cancel" id="batchCancel" onclick="cancelBatch()">取消</button>
+
+    <!-- 嗅探器 -->
+    <div class="modal" id="videoDownloaderModal">
+        <div class="modal-dialog">
+            <div class="modal-header"><h3>📥 网页视频嗅探</h3><span class="close-btn" onclick="closeModal('videoDownloaderModal')">&times;</span></div>
+            <div class="modal-body">
+                <input type="text" id="videoUrlInput" placeholder="输入网页视频链接 (B站/抖/管等)">
+                <input type="text" id="customFilename" placeholder="自定义保存名 (可选)">
+                <label style="display:flex; gap:10px; margin-bottom:15px; color:#aaa; font-size:14px;"><input type="checkbox" id="autoCompress" checked> 🗜️ 自动压缩体积</label>
+                <button onclick="startDownload()" id="downloadBtn" style="width:100%; padding:15px; background:var(--primary-color); color:white; border:none; border-radius:10px; font-weight:bold;">开始嗅探下载</button>
+            </div>
+        </div>
     </div>
-    
-    <!-- 移动端底部导航 -->
-    <nav class="mobile-nav" id="mobileNav" style="display: none;">
-        <div class="mobile-nav-item active" onclick="mobileNavTo('home')">
-            <span class="icon">🏠</span>
-            <span>首页</span>
-        </div>
-        <div class="mobile-nav-item" onclick="mobileNavTo('upload')">
-            <span class="icon">📤</span>
-            <span>上传</span>
-        </div>
-        <div class="mobile-nav-item" onclick="mobileNavTo('history')">
-            <span class="icon">📜</span>
-            <span>历史</span>
-        </div>
-        <div class="mobile-nav-item" onclick="mobileNavTo('stats')">
-            <span class="icon">📊</span>
-            <span>统计</span>
-        </div>
-        <div class="mobile-nav-item" onclick="mobileNavTo('settings')">
-            <span class="icon">⚙️</span>
-            <span>设置</span>
-        </div>
-    </nav>
-    
+
+    <script>window.videos = {{ videos | tojson }};</script>
     <script>
-        window.videos = {{ videos | tojson }};
-        window.currentPage = {{ page }};
-        window.totalPages = {{ total_pages }};
-        window.totalVideos = {{ total }};
-        
-        // 加载统计信息
-        fetch('/api/stats')
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('videoCount').textContent = `共 ${data.total_videos} 个视频`;
-                const size = data.total_size_gb >= 0.1 
-                    ? `${data.total_size_gb} GB` 
-                    : `${data.total_size_mb} MB`;
-                document.getElementById('storageStats').textContent = `| 💾 ${size}`;
+        /* ================= 业务核心 JS ================= */
+        let favorites = JSON.parse(localStorage.getItem('video_favorites') || '[]');
+        let selectedVideos = new Set();
+        let playerPosInterval;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initFavoritesUI();
+            fetch('/api/stats').then(r=>r.json()).then(d=>{
+                document.getElementById('videoCount').textContent=`共 ${d.total_videos}`;
+                document.getElementById('storageStats').textContent=`| ${d.total_size_gb>=0.1?d.total_size_gb+'GB':d.total_size_mb+'MB'}`;
             });
+        });
+
+        function showToast(msg, type='success') {
+            let c=document.getElementById('toast-container');
+            if(!c){c=document.createElement('div');c.id='toast-container';document.body.appendChild(c);}
+            const t=document.createElement('div'); t.className='toast'; t.style.borderLeftColor=type==='error'?'#ff44':'#e50914'; t.innerHTML=msg;
+            c.appendChild(t); setTimeout(()=>{t.style.opacity='0'; setTimeout(()=>t.remove(),300);},2500);
+        }
+
+        function openModal(id) { document.getElementById(id).style.display='block'; }
+        function closeModal(id) { document.getElementById(id).style.display='none'; }
+        function showPreview(el) { const s=el.querySelector('.thumb-static'), p=el.querySelector('.thumb-preview'); if(p&&p.src.endsWith('.gif')){if(s)s.style.display='none';p.style.display='block';} }
+        function hidePreview(el) { const s=el.querySelector('.thumb-static'), p=el.querySelector('.thumb-preview'); if(s)s.style.display='block';if(p)p.style.display='none'; }
+
+        // --- 播放器 ---
+        function openPlayerProtected(f) {
+            fetch(`/api/password/${f}`).then(r=>r.json()).then(d=>{
+                if(d.protected){
+                    const p=prompt(`此视频受密码保护\n提示：${d.hint||'无'}\n请输入密码：`);
+                    if(p){
+                        fetch(`/api/password/${f}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p})})
+                        .then(r=>r.json()).then(res=>{ if(res.success){document.cookie=`video_auth_${f}=${res.hash}; path=/; max-age=86400`;launchVideo(f);}else showToast('密码错误','error'); });
+                    }
+                }else launchVideo(f);
+            });
+        }
+        function launchVideo(f) {
+            openModal('playerModal'); document.getElementById('playerTitle').innerText=f; const p=document.getElementById('videoPlayer');
+            fetch(`/api/play/${f}`,{method:'POST'}); p.src=`/videos/${f}`; p.play().catch(e=>{});
+            clearInterval(playerPosInterval);
+            playerPosInterval=setInterval(()=>{ if(!p.paused&&p.duration) fetch(`/api/history/${f}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({position:p.currentTime,duration:p.duration})}); }, 5000);
+        }
+        function closePlayer() { closeModal('playerModal'); const p=document.getElementById('videoPlayer'); p.pause(); p.src=''; clearInterval(playerPosInterval); }
+
+        // --- 搜索与过滤 (彻底退出过滤) ---
+        let st;
+        document.getElementById('searchInput').addEventListener('keyup', e=>{
+            clearTimeout(st); st=setTimeout(()=>{ const k=e.target.value.toLowerCase(); document.querySelectorAll('.video-card').forEach(c=>c.style.display=c.getAttribute('data-name').toLowerCase().includes(k)?'block':'none'); },300);
+        });
+        
+        function clearSearch(){ 
+            document.getElementById('searchInput').value=''; 
+            document.getElementById('playlistFilterNotice').style.display='none'; // 隐藏合集横幅
+            document.querySelectorAll('.video-card').forEach(c=>c.style.display='block'); 
+            showToast('已显示全部视频');
+        }
+        
+        function toggleFavorite(f) {
+            if(favorites.includes(f)) favorites=favorites.filter(x=>x!==f); else favorites.push(f);
+            localStorage.setItem('video_favorites',JSON.stringify(favorites)); initFavoritesUI(); showToast('操作成功');
+        }
+        function initFavoritesUI(){ document.querySelectorAll('.btn-favorite').forEach(b=>{ if(favorites.includes(b.getAttribute('data-filename'))){b.innerHTML='🌟';b.style.color='#ffeb3b';}else{b.innerHTML='☆ 收藏';b.style.color='';} }); }
+        function showFavoritesOnly(){ document.querySelectorAll('.video-card').forEach(c=>c.style.display=favorites.includes(c.getAttribute('data-name'))?'block':'none'); showToast('已过滤收藏'); }
+
+        // --- 基础 ---
+        function downloadVideo(f) { const a=document.createElement('a'); a.href=`/videos/${f}`; a.download=f; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
+        function deleteVideo(f) { if(confirm(`彻底删除 [${f}] 吗？`)){ fetch(`/delete/${f}`,{method:'POST'}).then(r=>r.json()).then(d=>{if(d.success){showToast('已删除');setTimeout(()=>location.reload(),800);}else showToast('失败','error');}); } }
+
+        // ================= 全能批量操作区 =================
+        function toggleSelect(f) { selectedVideos.has(f)?selectedVideos.delete(f):selectedVideos.add(f); updateBatch(); }
+        function toggleAllSelect() { const ch=document.getElementById('selectAll').checked; document.querySelectorAll('.video-checkbox:not(#selectAll)').forEach(c=>{c.checked=ch; const f=c.getAttribute('data-filename'); ch?selectedVideos.add(f):selectedVideos.delete(f);}); updateBatch(); }
+        function updateBatch() { const b=document.getElementById('batchBar'); document.getElementById('batchCount').innerText=selectedVideos.size; if(selectedVideos.size>0){b.style.display='flex';setTimeout(()=>b.classList.add('show'),10);}else{b.classList.remove('show');setTimeout(()=>b.style.display='none',300);} }
+        function cancelBatch() { selectedVideos.clear(); document.getElementById('selectAll').checked=false; document.querySelectorAll('.video-checkbox').forEach(c=>c.checked=false); updateBatch(); }
+        
+        async function batchDelete(){ if(!confirm(`彻底删除选中的 ${selectedVideos.size} 个视频？不可恢复！`))return; showToast('删除中...','info'); for(let f of selectedVideos) await fetch(`/delete/${f}`,{method:'POST'}); showToast('完成'); setTimeout(()=>location.reload(),800); }
+        
+        function batchFavorite(){
+            let count = 0;
+            for(let f of selectedVideos){ if(!favorites.includes(f)){ favorites.push(f); count++; } }
+            localStorage.setItem('video_favorites',JSON.stringify(favorites)); initFavoritesUI();
+            showToast(`成功批量收藏 ${count} 个视频！`); cancelBatch();
+        }
+
+        async function batchDownload(){
+            if(!confirm(`将排队下载 ${selectedVideos.size} 个视频。\n浏览器可能会弹窗拦截多次下载请求，请务必点击"允许"。\n确认开始？`)) return;
+            let delay = 0;
+            showToast('已加入下载队列，请不要关闭页面', 'info');
+            for(let f of selectedVideos){
+                // 必须间隔下载，否则浏览器会拦截
+                setTimeout(() => downloadVideo(f), delay);
+                delay += 800; 
+            }
+            cancelBatch();
+        }
+
+        async function batchAddToPlaylist() {
+            openCommonModal(`📋 批量加入合集`, '<div class="loading">加载中...</div>');
+            const d = await(await fetch('/api/playlists')).json();
+            let h = `<div style="margin-bottom:15px; display:flex; gap:5px;"><input type="text" id="newPlNameBatch" placeholder="输入新合集名字" style="margin:0;"><button class="btn-search" style="white-space:nowrap;" onclick="createPlBatch()">创建并加入</button></div><div style="display:flex;flex-direction:column;gap:8px;">`;
+            d.playlists.forEach(p => {
+                h += `<div style="background:rgba(255,255,255,0.05);padding:10px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><span style="font-size:14px;">${p.name}</span> <button class="btn-search" style="padding:6px 12px;font-size:12px;background:var(--primary-color)" onclick="joinPlBatch('${p.id}')">将选中项全加入</button></div>`;
+            });
+            document.getElementById('commonModalContent').innerHTML = h + '</div>';
+        }
+
+        async function joinPlBatch(pid) {
+            showToast('正在批量写入...', 'info');
+            for (let f of selectedVideos) {
+                await fetch(`/api/playlists/${pid}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:f})});
+            }
+            showToast(`✅ 成功将 ${selectedVideos.size} 个视频装入合集！`);
+            closeModal('commonModal'); cancelBatch();
+        }
+        async function createPlBatch() { 
+            const n=document.getElementById('newPlNameBatch').value; if(!n)return; 
+            const r=await(await fetch('/api/playlists',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})})).json(); 
+            if(r.success) joinPlBatch(r.id); 
+        }
+
+        function openCommonModal(title, html) { document.getElementById('commonModalTitle').innerText=title; document.getElementById('commonModalContent').innerHTML=html; openModal('commonModal'); }
+
+        // ================= 我的合集面板 (进入合集过滤) =================
+        async function showMyPlaylists() {
+            openCommonModal('📋 我的合集', '<div class="loading">加载中...</div>');
+            try {
+                const res = await fetch('/api/playlists');
+                const data = await res.json();
+                let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
+                if(data.playlists.length === 0) {
+                    html += '<div style="color:#888;text-align:center;padding:20px;">还没有创建合集。</div>';
+                } else {
+                    data.playlists.forEach(p => {
+                        html += `
+                        <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div style="font-size:15px; font-weight:bold; color:var(--primary-color);">${p.name}</div>
+                                <div style="font-size:12px; color:#aaa; margin-top:4px;">包含 ${p.videos.length} 个视频</div>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <button onclick="viewPlaylist('${p.id}', '${p.name}')" class="btn-search">👁️ 查看全部</button>
+                                <button onclick="deletePlaylist('${p.id}')" class="btn-search" style="background:rgba(255,0,0,0.2);color:#ff4444;">🗑️</button>
+                            </div>
+                        </div>`;
+                    });
+                }
+                html += '</div>';
+                document.getElementById('commonModalContent').innerHTML = html;
+            } catch(e) { showToast('加载失败', 'error'); }
+        }
+
+        // 查看合集（主页过滤 & 显示退出横幅）
+        function viewPlaylist(pid, pname) {
+            closeModal('commonModal');
+            fetch('/api/playlists').then(r=>r.json()).then(d => {
+                const pl = d.playlists.find(p => p.id === pid);
+                if(!pl) return;
+                document.querySelectorAll('.video-card').forEach(c => {
+                    c.style.display = pl.videos.includes(c.getAttribute('data-name')) ? 'block' : 'none';
+                });
+                
+                // 显示红色的横幅提示
+                document.getElementById('currentPlaylistName').innerText = pname;
+                document.getElementById('playlistFilterNotice').style.display = 'flex';
+                showToast(`已展开合集: ${pname}`);
+            });
+        }
+
+        async function deletePlaylist(pid) {
+            if(!confirm('确定删除此合集吗？\n(这不会删除视频物理文件)')) return;
+            await fetch(`/api/playlists/${pid}`, {method:'DELETE'});
+            showToast('合集已解散'); showMyPlaylists(); 
+        }
+
+        // 单个加入合集
+        async function addToPlaylist(filename) {
+            openCommonModal(`📋 加入合集`, '<div class="loading">加载中...</div>');
+            const d = await(await fetch('/api/playlists')).json();
+            let h = `<div style="margin-bottom:15px; display:flex; gap:5px;"><input type="text" id="newPlName" placeholder="输入新合集名字" style="margin:0;"><button class="btn-search" style="white-space:nowrap;" onclick="createPl('${filename}')">创建并加入</button></div><div style="display:flex;flex-direction:column;gap:8px;">`;
+            d.playlists.forEach(p => {
+                const inList = p.videos.includes(filename);
+                h += `<div style="background:rgba(255,255,255,0.05);padding:10px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><span style="font-size:14px;">${p.name}</span> <button class="btn-search" style="padding:6px 12px;font-size:12px;${inList?'background:transparent;color:#666':'background:var(--primary-color)'}" ${inList?'disabled':`onclick="joinPl('${p.id}','${filename}')"`}>${inList?'已在其中':'加入'}</button></div>`;
+            });
+            document.getElementById('commonModalContent').innerHTML = h + '</div>';
+        }
+        async function createPl(f) { const n=document.getElementById('newPlName').value; if(!n)return; const r=await(await fetch('/api/playlists',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})})).json(); if(r.success) joinPl(r.id, f); }
+        async function joinPl(pid, f) { await fetch(`/api/playlists/${pid}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:f})}); showToast('成功加入！'); addToPlaylist(f); }
+
+        // --- 其他统计与设置 ---
+        async function showHistory() {
+            openCommonModal('📜 观看历史', '<div class="loading">加载中...</div>');
+            const d=await(await fetch('/api/history/recent')).json(); let h='<ul style="list-style:none;">';
+            for(let [f,i] of Object.entries(d.history)) h+=`<li style="padding:10px;border-bottom:1px solid var(--border-color);font-size:14px;"><div style="color:var(--primary-color);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" onclick="openPlayerProtected('${f}')">▶️ ${f}</div><div style="color:#888;font-size:11px;margin-top:5px;">看至 ${i.progress_percent}%</div></li>`;
+            document.getElementById('commonModalContent').innerHTML=h;
+        }
+        function showStats() {
+            openCommonModal('📊 统计', '<div class="loading">...</div>');
+            fetch('/api/stats').then(r=>r.json()).then(d=>{ document.getElementById('commonModalContent').innerHTML=`<div style="display:flex;gap:15px;justify-content:center;"><div style="background:rgba(255,255,255,0.05);padding:20px;border-radius:10px;text-align:center;flex:1;"><h3>${d.total_videos}</h3><p style="color:#888;font-size:12px;">视频数</p></div><div style="background:rgba(255,255,255,0.05);padding:20px;border-radius:10px;text-align:center;flex:1;"><h3>${d.total_size_gb>0.1?d.total_size_gb+'G':d.total_size_mb+'M'}</h3><p style="color:#888;font-size:12px;">占用空间</p></div></div>`; });
+        }
+        function showVideoSettings(f) {
+            openCommonModal(`⚙️ 设置`, `<div style="margin-bottom:15px;font-size:14px;">文件：${f}</div><h4 style="margin-bottom:8px;font-size:14px;">🔒 密码锁</h4><input type="password" id="pwdInput" placeholder="输入密码(留空解密)"><button onclick="savePwd('${f}')" class="btn-search" style="width:100%">保存密码</button><hr style="border-top:1px solid var(--border-color);margin:15px 0;"><h4 style="margin-bottom:8px;font-size:14px;">🖼️ 传封面</h4><input type="file" id="coverFile" style="margin-bottom:10px;color:#fff;font-size:12px;"><button onclick="uploadCover('${f}')" class="btn-search" style="width:100%">上传并替换</button>`);
+        }
+        async function savePwd(f){ await fetch(`/api/password/${f}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:document.getElementById('pwdInput').value})}); showToast('密码更新成功'); closeModal('commonModal'); }
+        async function uploadCover(f){ const file=document.getElementById('coverFile').files[0]; if(!file)return; const fd=new FormData(); fd.append('cover',file); await fetch(`/api/cover/upload/${f}`,{method:'POST',body:fd}); showToast('封面已替换'); setTimeout(()=>location.reload(),800); }
+
+        function showVideoDownloader() { openModal('videoDownloaderModal'); }
+        function startDownload() {
+            const url=document.getElementById('videoUrlInput').value; if(!url)return showToast("缺链接","error");
+            const b=document.getElementById('downloadBtn'); b.disabled=true; b.innerHTML="⏳ 嗅探并下载中...";
+            fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:url,customFilename:document.getElementById('customFilename').value,autoCompress:document.getElementById('autoCompress').checked})})
+            .then(r=>r.json()).then(d=>{if(d.success){showToast(`成功: ${d.filename}`);setTimeout(()=>location.reload(),1000);}else showToast(d.error,'error');}).finally(()=>{b.disabled=false;b.innerHTML="开始嗅探下载";});
+        }
+
+        // --- 上传防重 ---
+        document.getElementById('uploadForm').addEventListener('submit', async e=>{
+            e.preventDefault(); const files=document.getElementById('file').files; if(files.length===0)return showToast("选文件先","error");
+            document.getElementById('uploadBtn').disabled=true; document.getElementById('progressContainer').style.display='block';
+            let succ=0, fail=0, skip=[]; const comp=document.getElementById('compressCheck').checked;
+            for(let i=0; i<files.length; i++) {
+                const f=files[i]; document.getElementById('progressLabel').textContent=`传 ${f.name}`; document.getElementById('uploadFileCount').textContent=`${i+1}/${files.length}`; document.getElementById('progressBarFill').style.width='0%';
+                const fd=new FormData(); fd.append('file',f); fd.append('compress',comp?'true':'false');
+                try {
+                    await new Promise((res, rej)=>{
+                        const xhr=new XMLHttpRequest(); xhr.open('POST','/upload',true);
+                        xhr.upload.onprogress=ev=>{if(ev.lengthComputable){const p=Math.round((ev.loaded/ev.total)*100);document.getElementById('progressBarFill').style.width=p+'%';document.getElementById('progressPercent').textContent=p+'%';if(p===100)document.getElementById('progressLabel').textContent=`校验处理中...`;}};
+                        xhr.onload=()=>{if(xhr.status===200){const d=JSON.parse(xhr.responseText);succ+=d.uploaded.length;if(d.skipped)skip.push(...d.skipped);res();}else rej();}; xhr.onerror=rej; xhr.send(fd);
+                    });
+                }catch(err){fail++;}
+            }
+            let msg=`完成！成功: ${succ}, 失败: ${fail}`; if(skip.length>0)msg+=`\n⚠️ 秒传跳过 ${skip.length} 个重复文件`; alert(msg); location.reload();
+        });
     </script>
-    <script src="/static/js/app.js"></script>
 </body>
 </html>
-
-        <!-- 视频嗅探下载模态框 -->
-        <div id="videoDownloaderModal" class="modal" style="display: none;">
-            <div class="modal-dialog" style="max-width: 800px; margin: 50px auto; background: rgba(20,20,40,0.98); border-radius: 20px;">
-                <div class="modal-header" style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0;">📥 视频嗅探下载</h3>
-                    <span class="close-btn" onclick="closeVideoDownloader()" style="font-size: 40px; cursor: pointer; opacity: 0.7;">&times;</span>
-                </div>
-                <div class="modal-body" style="padding: 30px;">
-                    <!-- 下载方式选择 -->
-                    <div style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 10px; font-weight: 600;">📋 下载类型：</label>
-                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                            <button class="btn-search active" onclick="setDownloaderType('http')" id="typeHttp">🌐 网页视频</button>
-                            <button class="btn-search" onclick="setDownloaderType('magnet')" id="typeMagnet">🧲 磁力链接</button>
-                            <button class="btn-search" onclick="setDownloaderType('telegram')" id="typeTelegram">✈️ Telegram</button>
-                        </div>
-                    </div>
-                    
-                    <!-- 输入区域 -->
-                    <div style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 10px; font-weight: 600;">🔗 视频链接：</label>
-                        <input type="text" id="videoUrlInput" placeholder="粘贴视频链接..." 
-                               style="width: 100%; padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #fff; font-size: 14px;">
-                        <div id="urlHelp" style="margin-top: 10px; font-size: 12px; color: #888;">
-                            支持：MP4、WebM、FLV、AVI、MKV 等格式
-                        </div>
-                    </div>
-                    
-                    <!-- 高级选项 -->
-                    <details style="margin-bottom: 20px; background: rgba(255,255,255,0.03); border-radius: 10px; padding: 15px;">
-                        <summary style="cursor: pointer; font-weight: 600;">⚙️ 高级选项</summary>
-                        <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px;">
-                            <label style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" id="autoCompress" checked>
-                                <span>🗜️ 下载后自动压缩</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" id="saveOriginal">
-                                <span>📁 保留原始文件</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 10px;">
-                                <input type="text" id="customFilename" placeholder="自定义文件名（可选）" 
-                                       style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #fff; font-size: 13px;">
-                            </label>
-                        </div>
-                    </details>
-                    
-                    <!-- 下载按钮 -->
-                    <button onclick="startDownload()" id="downloadBtn" 
-                            style="width: 100%; padding: 15px; border-radius: 12px; border: none; background: linear-gradient(135deg, #e94560, #ff6b6b); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
-                        ⬇️ 开始下载
-                    </button>
-                    
-                    <!-- 下载进度 -->
-                    <div id="downloadProgress" style="margin-top: 20px; display: none;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                            <span id="downloadStatus">准备下载...</span>
-                            <span id="downloadPercent">0%</span>
-                        </div>
-                        <div style="height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; overflow: hidden;">
-                            <div id="downloadBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #e94560, #ff6b6b); transition: width 0.3s;"></div>
-                        </div>
-                        <div id="downloadInfo" style="margin-top: 10px; font-size: 12px; color: #888;"></div>
-                    </div>
-                    
-                    <!-- 下载历史 -->
-                    <div style="margin-top: 30px;">
-                        <h4 style="margin-bottom: 15px; font-weight: 600;">📜 下载历史</h4>
-                        <div id="downloadHistory" style="max-height: 300px; overflow-y: auto;">
-                            <div style="text-align: center; color: #888; padding: 20px;">暂无下载记录</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
